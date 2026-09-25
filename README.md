@@ -114,3 +114,7 @@ docker compose up -d
 | `POST` | `/api/products/adjust-stock` | Mutasi stok masuk (*IN*) atau keluar (*OUT*) | `ADMIN` & `STAFF` |
 | `PUT` | `/api/products/:id` | Mengubah informasi produk | `ADMIN` |
 | `DELETE`| `/api/products/:id` | Menghapus produk dari sistem | `ADMIN` |
+| `GET` | `/api/sales` | Mengambil seluruh riwayat penjualan & detail item | Bearer Token |
+| `POST` | `/api/sales` | Transaksi penjualan baru (auto deduct stok via ACID) | `ADMIN` & `STAFF` |
+| `GET` | `/api/purchases` | Mengambil seluruh riwayat pembelian PO & item | Bearer Token |
+| `POST` | `/api/purchases` | Transaksi pembelian baru (auto increase stok via ACID) | `ADMIN` & `STAFF` |

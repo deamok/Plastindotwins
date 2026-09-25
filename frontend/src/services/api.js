@@ -41,4 +41,14 @@ export const productService = {
   adjustStock: (data) => api.post('/products/adjust-stock', data),
 };
 
+export const saleService = {
+  getSales: () => api.get('/sales'),
+  createSale: (data) => api.post('/sales', data),
+};
+
+export const purchaseService = {
+  getPurchases: () => api.get('/purchases'),
+  createPurchase: (data) => api.post('/purchases', data),
+};
+
 export default api;
