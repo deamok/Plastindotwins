@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { productService, authService } from '../services/api';
+import { productService } from '../services/api';
 import { 
   Package, 
   AlertTriangle, 
@@ -12,7 +12,9 @@ import {
   CheckCircle2, 
   LogOut,
   User as UserIcon,
-  Layers
+  Layers,
+  ShieldAlert,
+  LogIn
 } from 'lucide-react';
 
 export default function Dashboard({ user, onLogout, onOpenAuth }) {
@@ -47,17 +49,33 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
 
   useEffect(() => {
     fetchInventory();
-  }, []);
+  }, [user]);
 
   const fetchInventory = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setProducts([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
       const response = await productService.getProducts();
       setProducts(response.data.data || []);
     } catch (err) {
-      const msg = err.response?.data?.message || 'Gagal memuat data stok dari server.';
-      setError(msg);
+      if (!err.response) {
+        setError('Gagal terhubung ke server (Network Error). Pastikan server backend sedang aktif.');
+      } else if (err.response.status === 401) {
+        if (user) {
+          setError('Sesi login telah kedaluwarsa. Silakan login ulang.');
+        }
+      } else if (err.response.status === 403) {
+        setError('Hak akses ditolak. Anda tidak memiliki izin untuk melihat data ini.');
+      } else {
+        setError(err.response.data?.message || 'Gagal memuat data inventori.');
+      }
       console.error(err);
     } finally {
       setLoading(false);
@@ -66,6 +84,16 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
 
   const handleCreateProduct = async (e) => {
     e.preventDefault();
+    if (!user) {
+      onOpenAuth();
+      return;
+    }
+    if (user.role !== 'ADMIN') {
+      setError('Gagal otorisasi: Hanya akun peran ADMIN yang diizinkan mendaftarkan produk baru.');
+      setIsAddModalOpen(false);
+      return;
+    }
+
     try {
       setError('');
       await productService.createProduct({
@@ -80,13 +108,22 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       fetchInventory();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menambahkan produk.');
+      if (err.response?.status === 403) {
+        setError('Hak akses ditolak: Akun Anda tidak memiliki izin ADMIN untuk menambahkan produk.');
+      } else {
+        setError(err.response?.data?.message || 'Gagal menambahkan produk.');
+      }
     }
   };
 
   const handleAdjustStock = async (e) => {
     e.preventDefault();
     if (!selectedProduct) return;
+    if (!user) {
+      onOpenAuth();
+      return;
+    }
+
     try {
       setError('');
       const res = await productService.adjustStock({
@@ -103,14 +140,34 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       fetchInventory();
       setTimeout(() => setSuccessMsg(''), 5000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal menyesuaikan stok.');
+      if (err.response?.status === 403) {
+        setError('Hak akses ditolak: Anda tidak memiliki izin untuk melakukan mutasi stok.');
+      } else {
+        setError(err.response?.data?.message || 'Gagal menyesuaikan stok.');
+      }
     }
   };
 
   const openAdjustModal = (product, initialType = 'STOCK_IN') => {
+    if (!user) {
+      onOpenAuth();
+      return;
+    }
     setSelectedProduct(product);
     setAdjustForm({ type: initialType, quantity: 1, notes: '' });
     setIsAdjustModalOpen(true);
+  };
+
+  const handleOpenAddModal = () => {
+    if (!user) {
+      onOpenAuth();
+      return;
+    }
+    if (user.role !== 'ADMIN') {
+      setError(`Gagal otorisasi: Akun Anda adalah "${user.role}". Hanya peran ADMIN yang dapat menambah produk baru.`);
+      return;
+    }
+    setIsAddModalOpen(true);
   };
 
   // Filtered products
@@ -149,7 +206,11 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
                   <div className="text-sm font-semibold text-slate-800">{user.name}</div>
-                  <div className="text-xs text-slate-500 uppercase tracking-wider font-mono">{user.role}</div>
+                  <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    user.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {user.role}
+                  </span>
                 </div>
                 <button
                   onClick={onLogout}
@@ -164,7 +225,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                 onClick={onOpenAuth}
                 className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-xs"
               >
-                <UserIcon className="w-4 h-4" /> Masuk / Login
+                <LogIn className="w-4 h-4" /> Masuk / Login
               </button>
             )}
           </div>
@@ -173,6 +234,29 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        {/* Banner if not logged in */}
+        {!user && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-600 text-white rounded-xl">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-blue-900">Autentikasi Diperlukan</h4>
+                <p className="text-xs text-blue-700 mt-0.5">
+                  Silakan login terlebih dahulu untuk mengakses data stok inventori dan melakukan mutasi barang.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onOpenAuth}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0 shadow-xs"
+            >
+              Login Sekarang
+            </button>
+          </div>
+        )}
+
         {/* Alerts */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-center justify-between">
@@ -263,7 +347,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
               <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
             </button>
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={handleOpenAddModal}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors"
             >
               <PlusCircle className="w-4 h-4" />
@@ -346,8 +430,12 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                   <tr>
                     <td colSpan="6" className="px-6 py-12 text-center text-slate-400">
                       <Package className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                      <p className="font-medium">Tidak ada produk ditemukan.</p>
-                      <p className="text-xs text-slate-400 mt-1">Coba sesuaikan pencarian atau tambah barang baru.</p>
+                      <p className="font-medium">
+                        {!user ? 'Silakan login untuk memuat daftar produk' : 'Tidak ada produk ditemukan.'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {!user ? 'Gunakan tombol Masuk / Login di pojok kanan atas.' : 'Coba sesuaikan pencarian atau tambah barang baru.'}
+                      </p>
                     </td>
                   </tr>
                 )}
@@ -377,7 +465,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: PLS-001"
+                  placeholder="Contoh: PLS-005"
                   value={newProduct.sku}
                   onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
@@ -389,7 +477,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Botol Plastik HDPE 500ml"
+                  placeholder="Contoh: Ember Plastik 20 Liter"
                   value={newProduct.name}
                   onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
@@ -414,7 +502,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                     type="number"
                     required
                     min="0"
-                    placeholder="2500"
+                    placeholder="25000"
                     value={newProduct.price}
                     onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
@@ -521,7 +609,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                 <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Catatan / Keterangan</label>
                 <input
                   type="text"
-                  placeholder="Misal: Pembelian Supplier X / Retur / Penjualan"
+                  placeholder="Misal: Pembelian Supplier / Retur / Penjualan"
                   value={adjustForm.notes}
                   onChange={(e) => setAdjustForm({ ...adjustForm, notes: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"

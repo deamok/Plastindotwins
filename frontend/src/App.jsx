@@ -17,13 +17,18 @@ export default function App() {
         .catch(() => {
           localStorage.removeItem('token');
           setUser(null);
+          setIsAuthModalOpen(true);
         });
+    } else {
+      // Buka modal login langsung jika belum memiliki sesi aktif
+      setIsAuthModalOpen(true);
     }
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    setIsAuthModalOpen(true);
   };
 
   return (
