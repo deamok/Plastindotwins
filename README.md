@@ -88,7 +88,7 @@ docker compose up -d
    ```bash
    npm run dev
    ```
-   *(Frontend akan berjalan di `http://localhost:3000`)*
+   *(Frontend akan berjalan di `http://localhost:3001`)*
 
 ---
 
