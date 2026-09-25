@@ -10,7 +10,9 @@ import {
   AlertTriangle,
   FileCheck,
   TrendingDown,
-  Layers
+  Layers,
+  Scale,
+  ArrowRight
 } from 'lucide-react';
 
 export default function PurchasesModule({ user, onOpenAuth }) {
@@ -30,7 +32,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
   const [paymentStatus, setPaymentStatus] = useState('PAID');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([
-    { productId: '', quantity: 1, costPrice: 0 }
+    { productId: '', purchaseQty: 1, purchaseUnit: 'kg', itemsPerUnit: 1, costPrice: 0 }
   ]);
 
   useEffect(() => {
@@ -59,10 +61,19 @@ export default function PurchasesModule({ user, onOpenAuth }) {
       onOpenAuth();
       return;
     }
+    const defaultProd = products[0];
     setSupplierName('');
     setPaymentStatus('PAID');
     setNotes('');
-    setItems([{ productId: products[0]?.id || '', quantity: 1, costPrice: products[0]?.costPrice || 0 }]);
+    setItems([
+      { 
+        productId: defaultProd?.id || '', 
+        purchaseQty: 10, 
+        purchaseUnit: defaultProd?.purchaseUnit || 'kg',
+        itemsPerUnit: defaultProd?.itemsPerPurchaseUnit || 1, 
+        costPrice: defaultProd?.costPrice || 0 
+      }
+    ]);
     setIsModalOpen(true);
   };
 
@@ -70,17 +81,25 @@ export default function PurchasesModule({ user, onOpenAuth }) {
     const selected = products.find((p) => p.id === prodId);
     const newItems = [...items];
     newItems[index].productId = prodId;
+    newItems[index].purchaseUnit = selected?.purchaseUnit || 'kg';
+    newItems[index].itemsPerUnit = parseFloat(selected?.itemsPerPurchaseUnit) || 1;
     newItems[index].costPrice = selected ? parseFloat(selected.costPrice || 0) : 0;
     setItems(newItems);
   };
 
-  const handleQuantityChange = (index, qty) => {
+  const handlePurchaseQtyChange = (index, qty) => {
     const newItems = [...items];
-    newItems[index].quantity = parseInt(qty) || 1;
+    newItems[index].purchaseQty = parseFloat(qty) || 0;
     setItems(newItems);
   };
 
-  const handlePriceChange = (index, cost) => {
+  const handleItemsPerUnitChange = (index, ratio) => {
+    const newItems = [...items];
+    newItems[index].itemsPerUnit = parseFloat(ratio) || 1;
+    setItems(newItems);
+  };
+
+  const handleCostPriceChange = (index, cost) => {
     const newItems = [...items];
     newItems[index].costPrice = parseFloat(cost) || 0;
     setItems(newItems);
@@ -90,7 +109,13 @@ export default function PurchasesModule({ user, onOpenAuth }) {
     const defaultProd = products[0];
     setItems([
       ...items,
-      { productId: defaultProd?.id || '', quantity: 1, costPrice: defaultProd?.costPrice || 0 }
+      { 
+        productId: defaultProd?.id || '', 
+        purchaseQty: 10, 
+        purchaseUnit: defaultProd?.purchaseUnit || 'kg',
+        itemsPerUnit: defaultProd?.itemsPerPurchaseUnit || 1, 
+        costPrice: defaultProd?.costPrice || 0 
+      }
     ]);
   };
 
@@ -100,7 +125,11 @@ export default function PurchasesModule({ user, onOpenAuth }) {
   };
 
   const calculateTotal = () => {
-    return items.reduce((acc, item) => acc + (item.quantity * item.costPrice), 0);
+    return items.reduce((acc, item) => acc + (item.purchaseQty * item.costPrice), 0);
+  };
+
+  const calculateTotalBaseUnits = () => {
+    return items.reduce((acc, item) => acc + Math.round(item.purchaseQty * item.itemsPerUnit), 0);
   };
 
   const handleSubmitPurchase = async (e) => {
@@ -135,7 +164,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
   const totalExpense = purchases.reduce((acc, p) => acc + parseFloat(p.totalAmount || 0), 0);
   const totalTransactions = purchases.length;
   const totalItemsPurchased = purchases.reduce(
-    (acc, p) => acc + p.items.reduce((sum, item) => sum + item.quantity, 0),
+    (acc, p) => acc + p.items.reduce((sum, item) => sum + (item.quantity || 0), 0),
     0
   );
 
@@ -188,8 +217,8 @@ export default function PurchasesModule({ user, onOpenAuth }) {
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-500">Total Barang Masuk (Stok In)</p>
-            <p className="text-2xl font-bold text-slate-900 mt-1">{totalItemsPurchased.toLocaleString('id-ID')} <span className="text-sm font-normal text-slate-500">pcs</span></p>
+            <p className="text-sm font-medium text-slate-500">Total Fisik Masuk Gudang</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{totalItemsPurchased.toLocaleString('id-ID')} <span className="text-sm font-normal text-slate-500">unit (buah/pak)</span></p>
           </div>
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
             <Layers className="w-6 h-6" />
@@ -235,13 +264,13 @@ export default function PurchasesModule({ user, onOpenAuth }) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="px-6 py-4">No Purchase Order (PO)</th>
+                <th className="px-6 py-4">No PO</th>
                 <th className="px-6 py-4">Waktu</th>
                 <th className="px-6 py-4">Pemasok / Supplier</th>
-                <th className="px-6 py-4">Status Pembayaran</th>
+                <th className="px-6 py-4">Rincian Pembelian (Kg & Konversi)</th>
                 <th className="px-6 py-4">Total Biaya</th>
-                <th className="px-6 py-4">Petugas</th>
-                <th className="px-6 py-4 text-right">Rincian Item</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -262,6 +291,25 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                       <span className="block text-xs text-slate-400">{purchase.notes}</span>
                     )}
                   </td>
+                  <td className="px-6 py-4">
+                    <div className="space-y-1">
+                      {purchase.items.map((it, idx) => (
+                        <div key={idx} className="text-xs text-slate-700">
+                          <span className="font-semibold text-slate-900">{it.product?.name}:</span>{' '}
+                          <span className="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                            {Number(it.purchaseQty)} {it.purchaseUnit || 'kg'}
+                          </span>{' '}
+                          <span className="text-slate-400">× {Number(it.itemsPerUnit)} =</span>{' '}
+                          <span className="font-bold text-emerald-700">
+                            +{it.quantity} {it.product?.unit || 'buah'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 font-bold text-slate-900 whitespace-nowrap">
+                    Rp {Number(purchase.totalAmount).toLocaleString('id-ID')}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                       purchase.paymentStatus === 'PAID'
@@ -271,18 +319,12 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                       {purchase.paymentStatus === 'PAID' ? 'LUNAS' : 'TEMPO / PENDING'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 font-bold text-slate-900 whitespace-nowrap">
-                    Rp {Number(purchase.totalAmount).toLocaleString('id-ID')}
-                  </td>
-                  <td className="px-6 py-4 text-xs text-slate-600 whitespace-nowrap">
-                    {purchase.user?.name || '-'}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <button
                       onClick={() => setSelectedPurchaseDetail(purchase)}
                       className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
                     >
-                      Lihat {purchase.items.length} Item
+                      Detail
                     </button>
                   </td>
                 </tr>
@@ -310,17 +352,27 @@ export default function PurchasesModule({ user, onOpenAuth }) {
         </div>
       </div>
 
-      {/* Modal: Catat Pembelian Baru */}
+      {/* Modal: Catat Pembelian Baru dengan Konversi Satuan */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Catat Pembelian dari Supplier</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Stok produk akan bertambah secara otomatis dan harga modal estimasi diperbarui.
-            </p>
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Catat Pembelian dari Supplier</h3>
+                <p className="text-xs text-slate-500">
+                  Pembelian dalam satuan <strong>Kg</strong> otomatis dikonversi ke stok satuan jual (<strong>Pak</strong> atau <strong>Buah</strong>).
+                </p>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={handleSubmitPurchase} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <form onSubmit={handleSubmitPurchase} className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Supplier / Pabrik</label>
                   <input
@@ -345,67 +397,123 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                 </div>
               </div>
 
-              {/* Items List */}
+              {/* Items List with Dynamic Conversion */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase mb-2">Item Barang yang Dibeli</label>
-                <div className="space-y-2.5">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-slate-700 uppercase flex items-center gap-1.5">
+                    <Scale className="w-4 h-4 text-blue-600" /> Item Barang & Rasio Konversi
+                  </label>
+                  <span className="text-[11px] text-slate-400">Isi per kg dapat disesuaikan tiap batch kedatangan</span>
+                </div>
+
+                <div className="space-y-3">
                   {items.map((item, index) => {
-                    const subtotal = item.quantity * item.costPrice;
+                    const currentProd = products.find((p) => p.id === item.productId);
+                    const baseUnit = currentProd?.unit || 'buah';
+                    const buyUnit = item.purchaseUnit || currentProd?.purchaseUnit || 'kg';
+                    const incomingUnits = Math.round(item.purchaseQty * item.itemsPerUnit);
+                    const subtotal = item.purchaseQty * item.costPrice;
+                    const hppPerUnit = incomingUnits > 0 ? (subtotal / incomingUnits) : 0;
 
                     return (
-                      <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row gap-2.5 items-center">
-                        <div className="flex-1 w-full sm:w-auto">
-                          <select
-                            required
-                            value={item.productId}
-                            onChange={(e) => handleProductChange(index, e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                          >
-                            <option value="" disabled>Pilih Produk...</option>
-                            {products.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                [{p.sku}] {p.name} (Stok Saat Ini: {p.stock})
-                              </option>
-                            ))}
-                          </select>
+                      <div key={index} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                          {/* Product Selection */}
+                          <div className="flex-1 w-full sm:w-auto">
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Pilih Produk</label>
+                            <select
+                              required
+                              value={item.productId}
+                              onChange={(e) => handleProductChange(index, e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                            >
+                              <option value="" disabled>Pilih Produk...</option>
+                              {products.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  [{p.sku}] {p.name} (Dijual dlm: {p.unit || 'buah'})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Purchase Qty (Kg) */}
+                          <div className="w-full sm:w-28">
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Jumlah ({buyUnit})</label>
+                            <input
+                              type="number"
+                              required
+                              step="any"
+                              min="0.1"
+                              placeholder="Misal 25"
+                              value={item.purchaseQty}
+                              onChange={(e) => handlePurchaseQtyChange(index, e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-center focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                            />
+                          </div>
+
+                          {/* Ratio Conversion: items per kg */}
+                          <div className="w-full sm:w-32">
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">
+                              Isi per 1 {buyUnit} ({baseUnit})
+                            </label>
+                            <input
+                              type="number"
+                              required
+                              step="any"
+                              min="1"
+                              placeholder={`Misal 120 ${baseUnit}`}
+                              value={item.itemsPerUnit}
+                              onChange={(e) => handleItemsPerUnitChange(index, e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-center text-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                            />
+                          </div>
+
+                          {/* Purchase Price per Kg */}
+                          <div className="w-full sm:w-32">
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Harga per {buyUnit} (Rp)</label>
+                            <input
+                              type="number"
+                              required
+                              min="0"
+                              placeholder="Harga / kg"
+                              value={item.costPrice}
+                              onChange={(e) => handleCostPriceChange(index, e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                            />
+                          </div>
+
+                          <div className="pt-4 hidden sm:block">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(index)}
+                              disabled={items.length === 1}
+                              className="p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-30 rounded-lg"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="w-24">
-                          <input
-                            type="number"
-                            required
-                            min="1"
-                            placeholder="Qty"
-                            value={item.quantity}
-                            onChange={(e) => handleQuantityChange(index, e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-center focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                          />
-                        </div>
+                        {/* Conversion & Subtotal Visual Feedback Banner */}
+                        <div className="p-2 bg-blue-50/70 border border-blue-100 rounded-lg flex flex-wrap items-center justify-between text-xs gap-2">
+                          <div className="flex items-center gap-2 text-slate-700">
+                            <span className="font-semibold text-blue-900">Konversi Stok Masuk:</span>
+                            <span className="font-mono bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-800">
+                              {item.purchaseQty} {buyUnit} × {item.itemsPerUnit} {baseUnit}/{buyUnit}
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5 text-blue-500" />
+                            <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              +{incomingUnits.toLocaleString('id-ID')} {baseUnit}
+                            </span>
+                          </div>
 
-                        <div className="w-32">
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            placeholder="Harga Beli"
-                            value={item.costPrice}
-                            onChange={(e) => handlePriceChange(index, e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                          />
+                          <div className="text-right">
+                            <span className="text-slate-500 mr-2 text-[11px]">HPP: Rp {hppPerUnit.toFixed(1)}/{baseUnit}</span>
+                            <span className="font-bold text-slate-900">
+                              Subtotal: Rp {subtotal.toLocaleString('id-ID')}
+                            </span>
+                          </div>
                         </div>
-
-                        <div className="w-28 text-right font-bold text-xs text-slate-800">
-                          Rp {subtotal.toLocaleString('id-ID')}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(index)}
-                          disabled={items.length === 1}
-                          className="p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-30 rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     );
                   })}
@@ -414,10 +522,10 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                 <button
                   type="button"
                   onClick={handleAddItem}
-                  className="mt-2.5 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
+                  className="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  <span>Tambah Baris Produk</span>
+                  <span>Tambah Baris Produk Lain</span>
                 </button>
               </div>
 
@@ -433,14 +541,22 @@ export default function PurchasesModule({ user, onOpenAuth }) {
               </div>
 
               {/* Total Summary */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
-                <span className="text-sm font-semibold text-blue-800">Total Biaya Pembelian:</span>
-                <span className="text-xl font-bold text-blue-900">
-                  Rp {calculateTotal().toLocaleString('id-ID')}
-                </span>
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-slate-500 block">Total Stok Fisik yang Ditambahkan:</span>
+                  <span className="text-base font-bold text-emerald-800">
+                    +{calculateTotalBaseUnits().toLocaleString('id-ID')} unit (buah/pak)
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-500 block">Total Biaya Pembelian:</span>
+                  <span className="text-xl font-bold text-blue-900">
+                    Rp {calculateTotal().toLocaleString('id-ID')}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3">
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -452,7 +568,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                   type="submit"
                   className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-xs"
                 >
-                  Simpan & Tambah Stok
+                  Simpan & Tambah Stok Masuk
                 </button>
               </div>
             </form>
@@ -486,13 +602,18 @@ export default function PurchasesModule({ user, onOpenAuth }) {
 
             <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
               {selectedPurchaseDetail.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg text-xs">
-                  <div>
-                    <span className="font-semibold text-slate-800">{item.product.name}</span>
-                    <span className="block text-[11px] text-slate-400">{item.quantity} pcs @ Rp {Number(item.costPrice).toLocaleString('id-ID')}</span>
+                <div key={item.id} className="p-3 bg-slate-50 rounded-xl text-xs space-y-1 border border-slate-100">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-800">{item.product?.name}</span>
+                    <span className="font-bold text-slate-900">Rp {Number(item.subtotal).toLocaleString('id-ID')}</span>
                   </div>
-                  <div className="font-bold text-slate-900">
-                    Rp {Number(item.subtotal).toLocaleString('id-ID')}
+                  <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                    <span>
+                      Dibeli: {Number(item.purchaseQty)} {item.purchaseUnit || 'kg'} × Rp {Number(item.costPrice).toLocaleString('id-ID')}
+                    </span>
+                    <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                      Masuk: +{item.quantity} {item.product?.unit || 'buah'}
+                    </span>
                   </div>
                 </div>
               ))}

@@ -22,7 +22,7 @@ exports.getAllProducts = async (req, res) => {
 // 2. Tambah Produk Baru
 exports.createProduct = async (req, res) => {
   try {
-    const { sku, name, description, stock, minStock, price } = req.body;
+    const { sku, name, description, stock, minStock, price, costPrice, unit, purchaseUnit, itemsPerPurchaseUnit } = req.body;
 
     if (!sku || !name || price === undefined) {
       return res.status(400).json({ message: 'SKU, nama, dan harga wajib diisi.' });
@@ -40,7 +40,11 @@ exports.createProduct = async (req, res) => {
         description: description || null,
         stock: stock ? parseInt(stock) : 0,
         minStock: minStock ? parseInt(minStock) : 5,
-        price
+        price,
+        costPrice: costPrice !== undefined ? costPrice : 0,
+        unit: unit || 'buah',
+        purchaseUnit: purchaseUnit || 'kg',
+        itemsPerPurchaseUnit: itemsPerPurchaseUnit ? parseFloat(itemsPerPurchaseUnit) : 1
       }
     });
     
@@ -107,7 +111,7 @@ exports.adjustStock = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, minStock, price } = req.body;
+    const { name, description, minStock, price, costPrice, unit, purchaseUnit, itemsPerPurchaseUnit } = req.body;
 
     const product = await prisma.product.update({
       where: { id },
@@ -115,7 +119,11 @@ exports.updateProduct = async (req, res) => {
         name,
         description,
         minStock: minStock !== undefined ? parseInt(minStock) : undefined,
-        price
+        price,
+        costPrice: costPrice !== undefined ? costPrice : undefined,
+        unit: unit !== undefined ? unit : undefined,
+        purchaseUnit: purchaseUnit !== undefined ? purchaseUnit : undefined,
+        itemsPerPurchaseUnit: itemsPerPurchaseUnit !== undefined ? parseFloat(itemsPerPurchaseUnit) : undefined
       }
     });
 

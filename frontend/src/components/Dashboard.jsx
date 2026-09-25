@@ -42,7 +42,11 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
     description: '',
     stock: 0,
     minStock: 5,
-    price: ''
+    unit: 'buah',
+    purchaseUnit: 'kg',
+    itemsPerPurchaseUnit: 120,
+    price: '',
+    costPrice: ''
   });
 
   // Form states - Adjust Stock
@@ -105,11 +109,24 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
         ...newProduct,
         stock: parseInt(newProduct.stock) || 0,
         minStock: parseInt(newProduct.minStock) || 5,
-        price: parseFloat(newProduct.price) || 0
+        itemsPerPurchaseUnit: parseFloat(newProduct.itemsPerPurchaseUnit) || 1,
+        price: parseFloat(newProduct.price) || 0,
+        costPrice: parseFloat(newProduct.costPrice) || 0
       });
       setSuccessMsg('Produk baru berhasil ditambahkan!');
       setIsAddModalOpen(false);
-      setNewProduct({ sku: '', name: '', description: '', stock: 0, minStock: 5, price: '' });
+      setNewProduct({
+        sku: '',
+        name: '',
+        description: '',
+        stock: 0,
+        minStock: 5,
+        unit: 'buah',
+        purchaseUnit: 'kg',
+        itemsPerPurchaseUnit: 120,
+        price: '',
+        costPrice: ''
+      });
       fetchInventory();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
@@ -439,48 +456,67 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <th className="px-6 py-4">SKU</th>
-                      <th className="px-6 py-4">Nama Produk</th>
-                      <th className="px-6 py-4">Harga Jual</th>
-                      <th className="px-6 py-4">Harga Beli/Modal</th>
-                      <th className="px-6 py-4">Stok Saat Ini</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4 text-right">Penyesuaian Cepat</th>
+                      <th className="px-5 py-4">SKU</th>
+                      <th className="px-5 py-4">Nama Produk</th>
+                      <th className="px-5 py-4">Satuan & Konversi</th>
+                      <th className="px-5 py-4">Harga Jual</th>
+                      <th className="px-5 py-4">Beli Supplier</th>
+                      <th className="px-5 py-4">Stok Saat Ini</th>
+                      <th className="px-5 py-4">Status</th>
+                      <th className="px-5 py-4 text-right">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {filteredProducts.map((product) => {
                       const isLowStock = product.stock <= product.minStock;
+                      const ratio = Number(product.itemsPerPurchaseUnit) || 1;
+                      const approxKg = ratio > 1 ? (product.stock / ratio).toFixed(1) : null;
+                      const unit = product.unit || 'buah';
+                      const pUnit = product.purchaseUnit || 'kg';
 
                       return (
                         <tr key={product.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-6 py-4 font-mono font-medium text-slate-700 whitespace-nowrap">
+                          <td className="px-5 py-4 font-mono font-medium text-slate-700 whitespace-nowrap">
                             {product.sku}
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-5 py-4">
                             <div className="font-semibold text-slate-900">{product.name}</div>
                             {product.description && (
                               <div className="text-xs text-slate-500 line-clamp-1">{product.description}</div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-800">
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <div className="text-xs space-y-0.5">
+                              <div>Jual: <span className="font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">{unit}</span></div>
+                              <div className="text-[11px] text-blue-700 font-mono">1 {pUnit} = {ratio} {unit}</div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 whitespace-nowrap font-medium text-slate-800">
                             Rp {Number(product.price).toLocaleString('id-ID')}
+                            <span className="text-[11px] text-slate-400 block">/{unit}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-500 font-mono">
+                          <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-500">
                             Rp {Number(product.costPrice || 0).toLocaleString('id-ID')}
+                            <span className="text-[10px] text-slate-400 block">/{pUnit}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="font-bold text-slate-900">{product.stock}</span>{' '}
-                            <span className="text-xs text-slate-500">pcs</span>
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <div className="font-bold text-slate-900">
+                              {product.stock.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-500">{unit}</span>
+                            </div>
+                            {approxKg && (
+                              <div className="text-[11px] text-slate-400 font-mono">
+                                ≈ {approxKg} {pUnit}
+                              </div>
+                            )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-5 py-4 whitespace-nowrap">
                             {isLowStock ? (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                                Low Stock (Min: {product.minStock})
+                                Low (Min: {product.minStock})
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 Aman
                               </span>
                             )}
@@ -540,37 +576,42 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       {/* Modal: Tambah Produk */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Tambah Produk Baru</h3>
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-slate-100 max-h-[92vh] overflow-y-auto">
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Tambah Master Produk Baru</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Konfigurasi satuan beli (Kg) dan satuan jual (Pak/Buah) dengan rasio konversi otomatis.
+            </p>
+
             <form onSubmit={handleCreateProduct} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">SKU</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: PLS-005"
-                  value={newProduct.sku}
-                  onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">SKU Barang</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: PLS-005"
+                    value={newProduct.sku}
+                    onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Produk</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Kantong Kresek Bening HD 24"
+                    value={newProduct.name}
+                    onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Produk</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Ember Plastik 20 Liter"
-                  value={newProduct.name}
-                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Deskripsi</label>
+                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Deskripsi Singkat</label>
                 <textarea
-                  placeholder="Keterangan bahan, warna, dll."
+                  placeholder="Keterangan ukuran, ketebalan mikron, bahan baku, dll."
                   rows="2"
                   value={newProduct.description}
                   onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
@@ -578,36 +619,109 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              {/* Satuan & Konversi Section */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <span className="text-xs font-bold text-slate-700 uppercase block">Konfigurasi Satuan & Rasio Timbangan</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Satuan Beli Supplier</label>
+                    <select
+                      value={newProduct.purchaseUnit}
+                      onChange={(e) => setNewProduct({ ...newProduct, purchaseUnit: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    >
+                      <option value="kg">Kilogram (kg)</option>
+                      <option value="karung">Karung</option>
+                      <option value="bal">Bal</option>
+                      <option value="roll">Roll</option>
+                      <option value="dus">Dus / Box</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Satuan Jual / Simpan</label>
+                    <select
+                      value={newProduct.unit}
+                      onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    >
+                      <option value="buah">Buah / Pcs</option>
+                      <option value="pak">Pak / Bungkus</option>
+                      <option value="lembar">Lembar</option>
+                      <option value="roll">Roll</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-blue-700 uppercase mb-1">
+                      Isi per 1 {newProduct.purchaseUnit} ({newProduct.unit})
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      step="any"
+                      min="1"
+                      placeholder="Misal 120"
+                      value={newProduct.itemsPerPurchaseUnit}
+                      onChange={(e) => setNewProduct({ ...newProduct, itemsPerPurchaseUnit: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-white border border-blue-200 text-blue-800 rounded-lg text-xs font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  ℹ️ Contoh: Jika beli 10 {newProduct.purchaseUnit}, sistem otomatis menambahkan {10 * (Number(newProduct.itemsPerPurchaseUnit) || 1)} {newProduct.unit} ke stok gudang.
+                </p>
+              </div>
+
+              {/* Harga Jual & Modal Beli */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Harga (Rp)</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                    Harga Jual per {newProduct.unit} (Rp)
+                  </label>
                   <input
                     type="number"
                     required
                     min="0"
-                    placeholder="25000"
+                    placeholder="Contoh: 1500"
                     value={newProduct.price}
                     onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Stok Awal</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                    Estimasi Beli per {newProduct.purchaseUnit} (Rp)
+                  </label>
                   <input
                     type="number"
                     min="0"
-                    placeholder="100"
+                    placeholder="Contoh: 30000"
+                    value={newProduct.costPrice}
+                    onChange={(e) => setNewProduct({ ...newProduct, costPrice: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Stok Awal ({newProduct.unit})</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
                     value={newProduct.stock}
                     onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Min. Stok</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Min. Alert Stok ({newProduct.unit})</label>
                   <input
                     type="number"
                     min="0"
-                    placeholder="5"
+                    placeholder="10"
                     value={newProduct.minStock}
                     onChange={(e) => setNewProduct({ ...newProduct, minStock: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"

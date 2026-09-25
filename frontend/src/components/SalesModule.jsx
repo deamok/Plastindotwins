@@ -369,23 +369,28 @@ export default function SalesModule({ user, onOpenAuth }) {
                             <option value="" disabled>Pilih Produk...</option>
                             {products.map((p) => (
                               <option key={p.id} value={p.id}>
-                                [{p.sku}] {p.name} (Sisa Stok: {p.stock})
+                                [{p.sku}] {p.name} (Sisa: {p.stock} {p.unit || 'buah'})
                               </option>
                             ))}
                           </select>
                         </div>
 
-                        <div className="w-24">
-                          <input
-                            type="number"
-                            required
-                            min="1"
-                            max={currentProd ? currentProd.stock : undefined}
-                            placeholder="Qty"
-                            value={item.quantity}
-                            onChange={(e) => handleQuantityChange(index, e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-center focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                          />
+                        <div className="w-28">
+                          <div className="relative">
+                            <input
+                              type="number"
+                              required
+                              min="1"
+                              max={currentProd ? currentProd.stock : undefined}
+                              placeholder="Qty"
+                              value={item.quantity}
+                              onChange={(e) => handleQuantityChange(index, e.target.value)}
+                              className="w-full pl-2.5 pr-10 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-center focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-semibold pointer-events-none">
+                              {currentProd?.unit || 'buah'}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="w-32">
@@ -495,7 +500,7 @@ export default function SalesModule({ user, onOpenAuth }) {
                 <div key={item.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg text-xs">
                   <div>
                     <span className="font-semibold text-slate-800">{item.product.name}</span>
-                    <span className="block text-[11px] text-slate-400">{item.quantity} pcs @ Rp {Number(item.unitPrice).toLocaleString('id-ID')}</span>
+                    <span className="block text-[11px] text-slate-400">{item.quantity} {item.product?.unit || 'buah'} @ Rp {Number(item.unitPrice).toLocaleString('id-ID')}</span>
                   </div>
                   <div className="font-bold text-slate-900">
                     Rp {Number(item.subtotal).toLocaleString('id-ID')}

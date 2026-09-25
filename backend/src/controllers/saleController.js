@@ -10,7 +10,7 @@ exports.getAllSales = async (req, res) => {
         items: {
           include: {
             product: {
-              select: { id: true, sku: true, name: true }
+              select: { id: true, sku: true, name: true, unit: true }
             }
           }
         },

@@ -10,7 +10,7 @@ exports.getAllPurchases = async (req, res) => {
         items: {
           include: {
             product: {
-              select: { id: true, sku: true, name: true }
+              select: { id: true, sku: true, name: true, unit: true, purchaseUnit: true, itemsPerPurchaseUnit: true }
             }
           }
         },
@@ -26,7 +26,7 @@ exports.getAllPurchases = async (req, res) => {
   }
 };
 
-// 2. Buat Transaksi Pembelian Baru dari Supplier (ACID Transaction)
+// 2. Buat Transaksi Pembelian Baru dari Supplier (ACID Transaction dengan Konversi Satuan)
 exports.createPurchase = async (req, res) => {
   try {
     const { supplierName, paymentStatus = 'PAID', notes, items } = req.body;
@@ -43,11 +43,12 @@ exports.createPurchase = async (req, res) => {
       const stockUpdates = [];
 
       for (const item of items) {
-        const qty = parseInt(item.quantity);
+        // Mendukung pembelian dalam Kg (purchaseQty) dan konversi ke satuan jual (pak/buah)
+        const pQty = parseFloat(item.purchaseQty !== undefined ? item.purchaseQty : item.quantity);
         const cost = parseFloat(item.costPrice);
 
-        if (!item.productId || isNaN(qty) || qty <= 0 || isNaN(cost) || cost < 0) {
-          throw new Error('Data item pembelian tidak valid (periksa produk, qty, dan harga beli).');
+        if (!item.productId || isNaN(pQty) || pQty <= 0 || isNaN(cost) || cost < 0) {
+          throw new Error('Data item pembelian tidak valid (periksa produk, jumlah beli, dan harga beli).');
         }
 
         const product = await tx.product.findUnique({
@@ -58,21 +59,37 @@ exports.createPurchase = async (req, res) => {
           throw new Error(`Produk dengan ID ${item.productId} tidak ditemukan.`);
         }
 
-        const subtotal = qty * cost;
+        // Rasio konversi: berapa pak/buah per 1 kg (diambil dari item atau master product)
+        const itemsPerUnit = parseFloat(
+          item.itemsPerUnit !== undefined ? item.itemsPerUnit : product.itemsPerPurchaseUnit || 1
+        );
+        const purchaseUnit = item.purchaseUnit || product.purchaseUnit || 'kg';
+
+        // Total stok dasar (buah/pak) yang masuk ke gudang
+        const baseQty = Math.round(pQty * itemsPerUnit);
+
+        const subtotal = pQty * cost;
         totalAmount += subtotal;
 
         purchaseItemsData.push({
           productId: product.id,
-          quantity: qty,
+          purchaseQty: pQty,
+          purchaseUnit: purchaseUnit,
+          itemsPerUnit: itemsPerUnit,
+          quantity: baseQty,
           costPrice: cost,
           subtotal
         });
 
         stockUpdates.push({
           productId: product.id,
-          newStock: product.stock + qty,
+          newStock: product.stock + baseQty,
           costPrice: cost,
-          quantity: qty
+          addedQty: baseQty,
+          pQty,
+          purchaseUnit,
+          itemsPerUnit,
+          baseUnit: product.unit || 'buah'
         });
       }
 
@@ -107,7 +124,7 @@ exports.createPurchase = async (req, res) => {
           where: { id: update.productId },
           data: {
             stock: update.newStock,
-            costPrice: update.costPrice // update estimasi modal terakhir
+            costPrice: update.costPrice // update estimasi modal beli per kg
           }
         });
 
@@ -115,8 +132,8 @@ exports.createPurchase = async (req, res) => {
           data: {
             productId: update.productId,
             type: 'STOCK_IN',
-            quantity: update.quantity,
-            notes: `Pembelian #${purchaseNo} (${supplierName})`
+            quantity: update.addedQty,
+            notes: `Pembelian #${purchaseNo} (${supplierName}) [${update.pQty} ${update.purchaseUnit} x ${update.itemsPerUnit} = +${update.addedQty} ${update.baseUnit}]`
           }
         });
       }
@@ -126,7 +143,7 @@ exports.createPurchase = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Transaksi pembelian berhasil disimpan dan stok telah ditambahkan.',
+      message: 'Transaksi pembelian berhasil disimpan dan stok telah dikonversi & ditambahkan.',
       data: createdPurchase
     });
   } catch (error) {
