@@ -59,4 +59,10 @@ export const contactService = {
   deleteContact: (id) => api.delete(`/contacts/${id}`),
 };
 
+export const locationService = {
+  getLocations: () => api.get('/locations'),
+  transferStock: (data) => api.post('/locations/transfer', data),
+  getTransfers: () => api.get('/locations/transfers'),
+};
+
 export default api;

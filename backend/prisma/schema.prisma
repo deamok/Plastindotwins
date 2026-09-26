@@ -15,6 +15,8 @@ enum Role {
 enum TransactionType {
   STOCK_IN
   STOCK_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
 }
 
 enum ContactType {
@@ -23,16 +25,22 @@ enum ContactType {
   BOTH
 }
 
+enum LocationType {
+  STORAGE // Hanya sebagai penyimpanan (Gudang Bangetayu)
+  OUTLET  // Merangkap outlet penjualan & toko (Outlet Jomblang)
+}
+
 model User {
-  id        String     @id @default(uuid())
-  email     String     @unique
-  password  String
-  name      String
-  role      Role       @default(STAFF)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  sales     Sale[]
-  purchases Purchase[]
+  id             String          @id @default(uuid())
+  email          String          @unique
+  password       String
+  name           String
+  role           Role            @default(STAFF)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  sales          Sale[]
+  purchases      Purchase[]
+  stockTransfers StockTransfer[]
 }
 
 model Contact {
@@ -52,33 +60,83 @@ model Contact {
   purchases         Purchase[]
 }
 
+model Location {
+  id            String          @id @default(uuid())
+  code          String          @unique // BANGETAYU, JOMBLANG
+  name          String          // Gudang Bangetayu, Outlet Jomblang
+  type          LocationType    @default(STORAGE)
+  address       String?
+  description   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  stocks        ProductStock[]
+  transfersFrom StockTransfer[] @relation("TransferSource")
+  transfersTo   StockTransfer[] @relation("TransferDest")
+  transactions  Transaction[]
+  sales         Sale[]
+  purchases     Purchase[]
+}
+
 model Product {
-  id                   String         @id @default(uuid())
-  sku                  String         @unique
+  id                   String          @id @default(uuid())
+  sku                  String          @unique
   name                 String
   description          String?
-  stock                Int            @default(0) // Stok dasar dalam satuan jual (buah/pak/pcs)
-  minStock             Int            @default(5)
-  unit                 String         @default("buah") // Satuan jual: buah, pak, pcs, lembar
-  purchaseUnit         String         @default("kg")   // Satuan beli: kg, karung, bal, dus
-  itemsPerPurchaseUnit Decimal        @default(1) @db.Decimal(10, 2) // Jumlah buah/pak per 1 kg (bervariasi tiap barang!)
-  price                Decimal        @db.Decimal(10, 2) // Harga Jual per satuan jual (buah/pak)
-  costPrice            Decimal        @default(0) @db.Decimal(10, 2) // Estimasi Harga Beli Modal per kg
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  stock                Int             @default(0) // Total stok gabungan semua lokasi (dalam satuan jual: buah/pak/pcs)
+  minStock             Int             @default(5)
+  unit                 String          @default("buah") // Satuan jual: buah, pak, pcs, lembar
+  purchaseUnit         String          @default("kg")   // Satuan beli: kg, karung, bal, dus
+  itemsPerPurchaseUnit Decimal         @default(1) @db.Decimal(10, 2) // Jumlah buah/pak per 1 kg
+  price                Decimal         @db.Decimal(10, 2) // Harga Jual per satuan jual (buah/pak)
+  costPrice            Decimal         @default(0) @db.Decimal(10, 2) // Estimasi Harga Beli Modal per kg
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  stocks               ProductStock[]
   transactions         Transaction[]
+  stockTransfers       StockTransfer[]
   saleItems            SaleItem[]
   purchaseItems        PurchaseItem[]
 }
 
+model ProductStock {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  stock      Int      @default(0) // Stok dasar barang di lokasi ini
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([productId, locationId])
+}
+
+model StockTransfer {
+  id               String   @id @default(uuid())
+  transferNo       String   @unique // TRF-20260926-1234
+  sourceLocationId String
+  sourceLocation   Location @relation("TransferSource", fields: [sourceLocationId], references: [id], onDelete: Restrict)
+  destLocationId   String
+  destLocation     Location @relation("TransferDest", fields: [destLocationId], references: [id], onDelete: Restrict)
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity         Int      // Jumlah unit dasar produk yang ditransfer
+  notes            String?
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+}
+
 model Transaction {
-  id        String          @id @default(uuid())
-  productId String
-  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  type      TransactionType
-  quantity  Int
-  notes     String?
-  createdAt DateTime        @default(now())
+  id         String          @id @default(uuid())
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locationId String?
+  location   Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  type       TransactionType
+  quantity   Int
+  notes      String?
+  createdAt  DateTime        @default(now())
 }
 
 model Sale {
@@ -87,6 +145,8 @@ model Sale {
   customerName  String
   contactId     String?
   contact       Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  locationId    String?
+  location      Location?  @relation(fields: [locationId], references: [id], onDelete: SetNull)
   totalAmount   Decimal    @db.Decimal(12, 2)
   paymentMethod String     @default("CASH") // CASH, TRANSFER, TEMPO
   notes         String?
@@ -105,7 +165,7 @@ model SaleItem {
   product      Product  @relation(fields: [productId], references: [id])
   saleQty      Decimal  @default(1) @db.Decimal(10, 2) // Jumlah yang dijual dalam satuan terpilih (misal: 2 lusin atau 5 pack)
   saleUnit     String   @default("buah") // Satuan transaksi penjualan: buah, pcs, lusin, pak/pack, kodi, dus, dll.
-  itemsPerUnit Decimal  @default(1) @db.Decimal(10, 2) // Rasio konversi: berapa unit stok dasar per 1 satuan penjualan (misal: 12 untuk lusin, 50 untuk pack)
+  itemsPerUnit Decimal  @default(1) @db.Decimal(10, 2) // Rasio konversi: berapa unit stok dasar per 1 satuan penjualan
   quantity     Int      // Total unit stok fisik yang berkurang dalam satuan dasar produk (buah/pak)
   unitPrice    Decimal  @db.Decimal(10, 2) // Harga per satuan transaksi terpilih
   subtotal     Decimal  @db.Decimal(12, 2) // saleQty * unitPrice
@@ -118,6 +178,8 @@ model Purchase {
   supplierName  String
   contactId     String?
   contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  locationId    String?
+  location      Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
   totalAmount   Decimal        @db.Decimal(12, 2)
   paymentStatus String         @default("PAID") // PAID, PENDING
   notes         String?

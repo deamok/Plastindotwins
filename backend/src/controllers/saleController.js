@@ -7,6 +7,9 @@ exports.getAllSales = async (req, res) => {
     const sales = await prisma.sale.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
+        location: {
+          select: { id: true, code: true, name: true, type: true }
+        },
         items: {
           include: {
             product: {
@@ -30,9 +33,10 @@ exports.getAllSales = async (req, res) => {
 };
 
 // 2. Buat Transaksi Penjualan Baru (ACID Transaction)
+// Default memotong stok dari Outlet Jomblang (outlet penjualan)
 exports.createSale = async (req, res) => {
   try {
-    const { customerName, contactId, paymentMethod = 'CASH', notes, items } = req.body;
+    const { customerName, contactId, locationId, paymentMethod = 'CASH', notes, items } = req.body;
     const userId = req.user?.id || null;
 
     let finalCustomerName = customerName;
@@ -49,13 +53,23 @@ exports.createSale = async (req, res) => {
 
     // Eksekusi transaksi atomik di PostgreSQL
     const createdSale = await prisma.$transaction(async (tx) => {
+      // 1. Tentukan lokasi outlet/gudang sumber pengurangan stok (default: Outlet Jomblang)
+      let targetLoc;
+      if (locationId) {
+        targetLoc = await tx.location.findUnique({ where: { id: locationId } });
+      }
+      if (!targetLoc) {
+        targetLoc = await tx.location.findFirst({ where: { type: 'OUTLET' } }) ||
+                    await tx.location.findFirst({ where: { code: 'JOMBLANG' } }) ||
+                    await tx.location.findFirst();
+      }
+
       let totalAmount = 0;
       const saleItemsData = [];
       const stockUpdates = [];
 
-      // Validasi setiap item & ketersediaan stok
+      // 2. Validasi setiap item & ketersediaan stok fisik di lokasi terkait
       for (const item of items) {
-        // Mendukung transaksi penjualan dalam berbagai satuan (misal: lusin, pack, kodi, pcs, dll.)
         const sQty = parseFloat(item.saleQty !== undefined ? item.saleQty : item.quantity);
         const price = parseFloat(item.unitPrice);
 
@@ -75,9 +89,25 @@ exports.createSale = async (req, res) => {
         const saleUnit = item.saleUnit || product.unit || 'buah';
         const baseQty = Math.round(sQty * itemsPerUnit);
 
-        if (product.stock < baseQty) {
+        // Ambil stok produk khusus di lokasi target (misal Outlet Jomblang)
+        const productStock = await tx.productStock.findUnique({
+          where: {
+            productId_locationId: { productId: product.id, locationId: targetLoc.id }
+          }
+        });
+
+        const currentLocStock = productStock ? productStock.stock : 0;
+
+        if (currentLocStock < baseQty) {
+          // Cari info stok di gudang lain (misal Gudang Bangetayu) untuk saran mutasi
+          const otherStocks = await tx.productStock.findMany({
+            where: { productId: product.id, NOT: { locationId: targetLoc.id } },
+            include: { location: true }
+          });
+          const otherInfo = otherStocks.map(s => `${s.location.name}: ${s.stock} ${product.unit}`).join(', ');
+
           throw new Error(
-            `Stok "${product.name}" tidak mencukupi! Sisa stok: ${product.stock} ${product.unit}, dibutuhkan: ${baseQty} ${product.unit} (${sQty} ${saleUnit}).`
+            `Stok "${product.name}" di ${targetLoc.name} tidak mencukupi! Sisa stok: ${currentLocStock} ${product.unit}, dibutuhkan: ${baseQty} ${product.unit} (${sQty} ${saleUnit}).${otherInfo ? ` [Tersedia di ${otherInfo}]` : ''}`
           );
         }
 
@@ -102,23 +132,27 @@ exports.createSale = async (req, res) => {
         stockUpdates.push({
           productId: product.id,
           productName: product.name,
-          newStock: product.stock - baseQty,
+          currentTotalStock: product.stock,
+          currentLocStock,
+          newLocStock: currentLocStock - baseQty,
+          newTotalStock: product.stock - baseQty,
           quantity: baseQty,
           noteDetail
         });
       }
 
-      // Generate Nomor Invoice Unik
+      // 3. Generate Nomor Invoice Unik
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const invoiceNo = `INV-${dateStr}-${randomSuffix}`;
 
-      // Buat Header Penjualan & Detail Items
+      // 4. Buat Header Penjualan & Detail Items
       const sale = await tx.sale.create({
         data: {
           invoiceNo,
           customerName: finalCustomerName,
           contactId: contactId || null,
+          locationId: targetLoc.id,
           totalAmount,
           paymentMethod,
           notes: notes || null,
@@ -128,6 +162,7 @@ exports.createSale = async (req, res) => {
           }
         },
         include: {
+          location: true,
           items: {
             include: { product: true }
           },
@@ -135,19 +170,30 @@ exports.createSale = async (req, res) => {
         }
       });
 
-      // Update stok produk dan catat log mutasi inventori
+      // 5. Update stok lokasi, stok total produk, dan catat log mutasi inventori
       for (const update of stockUpdates) {
-        await tx.product.update({
-          where: { id: update.productId },
-          data: { stock: update.newStock }
+        // Kurangi stok di lokasi target
+        await tx.productStock.update({
+          where: {
+            productId_locationId: { productId: update.productId, locationId: targetLoc.id }
+          },
+          data: { stock: update.newLocStock }
         });
 
+        // Kurangi total stok produk
+        await tx.product.update({
+          where: { id: update.productId },
+          data: { stock: update.newTotalStock }
+        });
+
+        // Catat di kartu mutasi
         await tx.transaction.create({
           data: {
             productId: update.productId,
+            locationId: targetLoc.id,
             type: 'STOCK_OUT',
             quantity: update.quantity,
-            notes: `Penjualan #${invoiceNo} (${customerName})${update.noteDetail}`
+            notes: `Penjualan #${invoiceNo} (${finalCustomerName}) di ${targetLoc.name}${update.noteDetail}`
           }
         });
       }
@@ -157,7 +203,7 @@ exports.createSale = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Transaksi penjualan berhasil disimpan dan stok telah diperbarui.',
+      message: `Transaksi penjualan berhasil disimpan dan stok di ${createdSale.location?.name || 'outlet'} telah dipotong.`,
       data: createdSale
     });
   } catch (error) {

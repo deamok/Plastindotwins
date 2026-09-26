@@ -7,6 +7,9 @@ exports.getAllPurchases = async (req, res) => {
     const purchases = await prisma.purchase.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
+        location: {
+          select: { id: true, code: true, name: true, type: true }
+        },
         items: {
           include: {
             product: {
@@ -30,9 +33,10 @@ exports.getAllPurchases = async (req, res) => {
 };
 
 // 2. Buat Transaksi Pembelian Baru dari Supplier (ACID Transaction dengan Konversi Satuan)
+// Default masuk ke Gudang Bangetayu (Pusat Penyimpanan)
 exports.createPurchase = async (req, res) => {
   try {
-    const { supplierName, contactId, paymentStatus = 'PAID', notes, items } = req.body;
+    const { supplierName, contactId, locationId, paymentStatus = 'PAID', notes, items } = req.body;
     const userId = req.user?.id || null;
 
     let finalSupplierName = supplierName;
@@ -49,12 +53,22 @@ exports.createPurchase = async (req, res) => {
 
     // Eksekusi transaksi atomik di PostgreSQL
     const createdPurchase = await prisma.$transaction(async (tx) => {
+      // 1. Tentukan lokasi gudang penerimaan barang (default: Gudang Bangetayu)
+      let targetLoc;
+      if (locationId) {
+        targetLoc = await tx.location.findUnique({ where: { id: locationId } });
+      }
+      if (!targetLoc) {
+        targetLoc = await tx.location.findFirst({ where: { type: 'STORAGE' } }) ||
+                    await tx.location.findFirst({ where: { code: 'BANGETAYU' } }) ||
+                    await tx.location.findFirst();
+      }
+
       let totalAmount = 0;
       const purchaseItemsData = [];
       const stockUpdates = [];
 
       for (const item of items) {
-        // Mendukung pembelian dalam Kg (purchaseQty) dan konversi ke satuan jual (pak/buah)
         const pQty = parseFloat(item.purchaseQty !== undefined ? item.purchaseQty : item.quantity);
         const cost = parseFloat(item.costPrice);
 
@@ -70,7 +84,7 @@ exports.createPurchase = async (req, res) => {
           throw new Error(`Produk dengan ID ${item.productId} tidak ditemukan.`);
         }
 
-        // Rasio konversi: berapa pak/buah per 1 kg (diambil dari item atau master product)
+        // Rasio konversi: berapa pak/buah per 1 kg
         const itemsPerUnit = parseFloat(
           item.itemsPerUnit !== undefined ? item.itemsPerUnit : product.itemsPerPurchaseUnit || 1
         );
@@ -92,9 +106,20 @@ exports.createPurchase = async (req, res) => {
           subtotal
         });
 
+        // Ambil stok produk di gudang target penerimaan
+        const locStock = await tx.productStock.findUnique({
+          where: {
+            productId_locationId: { productId: product.id, locationId: targetLoc.id }
+          }
+        });
+        const currentLocStock = locStock ? locStock.stock : 0;
+
         stockUpdates.push({
           productId: product.id,
-          newStock: product.stock + baseQty,
+          currentTotalStock: product.stock,
+          newTotalStock: product.stock + baseQty,
+          currentLocStock,
+          newLocStock: currentLocStock + baseQty,
           costPrice: cost,
           addedQty: baseQty,
           pQty,
@@ -104,17 +129,18 @@ exports.createPurchase = async (req, res) => {
         });
       }
 
-      // Generate Nomor PO Unik
+      // 2. Generate Nomor PO Unik
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const purchaseNo = `PO-${dateStr}-${randomSuffix}`;
 
-      // Buat Header Pembelian & Detail Items
+      // 3. Buat Header Pembelian & Detail Items
       const purchase = await tx.purchase.create({
         data: {
           purchaseNo,
           supplierName: finalSupplierName,
           contactId: contactId || null,
+          locationId: targetLoc.id,
           totalAmount,
           paymentStatus,
           notes: notes || null,
@@ -124,6 +150,7 @@ exports.createPurchase = async (req, res) => {
           }
         },
         include: {
+          location: true,
           items: {
             include: { product: true }
           },
@@ -131,22 +158,38 @@ exports.createPurchase = async (req, res) => {
         }
       });
 
-      // Update stok produk & catat log mutasi penambahan stok
+      // 4. Update stok lokasi & total produk serta catat log mutasi penambahan stok
       for (const update of stockUpdates) {
+        // Update stok di gudang penerimaan
+        await tx.productStock.upsert({
+          where: {
+            productId_locationId: { productId: update.productId, locationId: targetLoc.id }
+          },
+          update: { stock: update.newLocStock },
+          create: {
+            productId: update.productId,
+            locationId: targetLoc.id,
+            stock: update.newLocStock
+          }
+        });
+
+        // Update total stok & modal produk
         await tx.product.update({
           where: { id: update.productId },
           data: {
-            stock: update.newStock,
+            stock: update.newTotalStock,
             costPrice: update.costPrice // update estimasi modal beli per kg
           }
         });
 
+        // Catat di kartu mutasi
         await tx.transaction.create({
           data: {
             productId: update.productId,
+            locationId: targetLoc.id,
             type: 'STOCK_IN',
             quantity: update.addedQty,
-            notes: `Pembelian #${purchaseNo} (${supplierName}) [${update.pQty} ${update.purchaseUnit} x ${update.itemsPerUnit} = +${update.addedQty} ${update.baseUnit}]`
+            notes: `Pembelian #${purchaseNo} (${finalSupplierName}) di ${targetLoc.name} [${update.pQty} ${update.purchaseUnit} x ${update.itemsPerUnit} = +${update.addedQty} ${update.baseUnit}]`
           }
         });
       }
@@ -156,7 +199,7 @@ exports.createPurchase = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Transaksi pembelian berhasil disimpan dan stok telah dikonversi & ditambahkan.',
+      message: `Transaksi pembelian berhasil disimpan dan stok telah masuk ke ${createdPurchase.location?.name || 'gudang'}.`,
       data: createdPurchase
     });
   } catch (error) {

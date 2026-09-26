@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { purchaseService, productService, contactService } from '../services/api';
+import { purchaseService, productService, contactService, locationService } from '../services/api';
 import { 
   Truck, 
   PlusCircle, 
@@ -18,13 +18,16 @@ import {
   Copy,
   Check,
   Phone,
-  MapPin
+  MapPin,
+  Building2,
+  Store
 } from 'lucide-react';
 
 export default function PurchasesModule({ user, onOpenAuth }) {
   const [purchases, setPurchases] = useState([]);
   const [products, setProducts] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -38,6 +41,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
   // Form State
   const [supplierName, setSupplierName] = useState('');
   const [contactId, setContactId] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('PAID');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([
@@ -52,14 +56,16 @@ export default function PurchasesModule({ user, onOpenAuth }) {
     try {
       setLoading(true);
       setError('');
-      const [purchasesRes, prodRes, contactsRes] = await Promise.all([
+      const [purchasesRes, prodRes, contactsRes, locsRes] = await Promise.all([
         purchaseService.getPurchases(),
         productService.getProducts(),
-        contactService.getContacts({ type: 'SUPPLIER' }).catch(() => ({ data: { data: [] } }))
+        contactService.getContacts({ type: 'SUPPLIER' }).catch(() => ({ data: { data: [] } })),
+        locationService.getLocations().catch(() => ({ data: { data: [] } }))
       ]);
       setPurchases(purchasesRes.data.data || []);
       setProducts(prodRes.data.data || []);
       setContacts(contactsRes.data.data || []);
+      setLocations(locsRes.data.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal memuat data pembelian.');
     } finally {
@@ -73,8 +79,11 @@ export default function PurchasesModule({ user, onOpenAuth }) {
       return;
     }
     const defaultProd = products[0];
+    const defaultLoc = locations.find((l) => l.code === 'BANGETAYU') || locations[0];
+
     setSupplierName('');
     setContactId('');
+    setLocationId(defaultLoc?.id || '');
     setPaymentStatus('PAID');
     setNotes('');
     setItems([
@@ -151,6 +160,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
       const res = await purchaseService.createPurchase({
         supplierName,
         contactId: contactId || null,
+        locationId: locationId || undefined,
         paymentStatus,
         notes,
         items
@@ -281,6 +291,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
               <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 <th className="px-6 py-4">No PO</th>
                 <th className="px-6 py-4">Waktu</th>
+                <th className="px-6 py-4">Gudang Penerimaan</th>
                 <th className="px-6 py-4">Pemasok / Supplier</th>
                 <th className="px-6 py-4">Rincian Pembelian (Kg & Konversi)</th>
                 <th className="px-6 py-4">Total Biaya</th>
@@ -299,6 +310,12 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                       dateStyle: 'medium',
                       timeStyle: 'short'
                     })}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                      <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{purchase.location?.name || 'Gudang Bangetayu'}</span>
+                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="font-medium text-slate-900 flex items-center gap-1.5">
@@ -483,16 +500,34 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                     );
                   })()}
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Status Pembayaran</label>
-                  <select
-                    value={paymentStatus}
-                    onChange={(e) => setPaymentStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden bg-white"
-                  >
-                    <option value="PAID">Lunas (Paid)</option>
-                    <option value="PENDING">Tempo / Pending</option>
-                  </select>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                      Gudang Penerimaan Barang
+                    </label>
+                    <select
+                      value={locationId}
+                      onChange={(e) => setLocationId(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-amber-300 bg-amber-50/50 text-amber-900 rounded-xl text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                    >
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name} {loc.code === 'BANGETAYU' ? '(Pusat Penyimpanan Utama)' : '(Outlet Penjualan)'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Status Pembayaran</label>
+                    <select
+                      value={paymentStatus}
+                      onChange={(e) => setPaymentStatus(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden bg-white"
+                    >
+                      <option value="PAID">Lunas (Paid)</option>
+                      <option value="PENDING">Tempo / Pending</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 

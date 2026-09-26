@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { saleService, productService, contactService } from '../services/api';
+import { saleService, productService, contactService, locationService } from '../services/api';
 import { 
   ShoppingCart, 
   PlusCircle, 
@@ -18,13 +18,16 @@ import {
   Users,
   CreditCard,
   Phone,
-  MapPin
+  MapPin,
+  Store,
+  Building2
 } from 'lucide-react';
 
 export default function SalesModule({ user, onOpenAuth }) {
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -37,6 +40,7 @@ export default function SalesModule({ user, onOpenAuth }) {
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [contactId, setContactId] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([
@@ -59,14 +63,16 @@ export default function SalesModule({ user, onOpenAuth }) {
     try {
       setLoading(true);
       setError('');
-      const [salesRes, prodRes, contactsRes] = await Promise.all([
+      const [salesRes, prodRes, contactsRes, locsRes] = await Promise.all([
         saleService.getSales(),
         productService.getProducts(),
-        contactService.getContacts({ type: 'CUSTOMER' }).catch(() => ({ data: { data: [] } }))
+        contactService.getContacts({ type: 'CUSTOMER' }).catch(() => ({ data: { data: [] } })),
+        locationService.getLocations().catch(() => ({ data: { data: [] } }))
       ]);
       setSales(salesRes.data.data || []);
       setProducts(prodRes.data.data || []);
       setContacts(contactsRes.data.data || []);
+      setLocations(locsRes.data.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal memuat data penjualan.');
     } finally {
@@ -82,9 +88,11 @@ export default function SalesModule({ user, onOpenAuth }) {
     const defaultProd = products[0];
     const defaultUnit = defaultProd?.unit || 'buah';
     const defaultPrice = defaultProd ? parseFloat(defaultProd.price || 0) : 0;
+    const defaultLoc = locations.find((l) => l.code === 'JOMBLANG') || locations[0];
 
     setCustomerName('');
     setContactId('');
+    setLocationId(defaultLoc?.id || '');
     setPaymentMethod('CASH');
     setNotes('');
     setItems([
@@ -228,7 +236,7 @@ export default function SalesModule({ user, onOpenAuth }) {
     try {
       setError('');
 
-      // Validasi ketersediaan stok sebelum submit
+      // Validasi ketersediaan stok di lokasi terpilih sebelum submit
       for (const item of items) {
         const prod = products.find((p) => p.id === item.productId);
         const sQty = parseFloat(item.saleQty) || 0;
@@ -240,9 +248,17 @@ export default function SalesModule({ user, onOpenAuth }) {
           return;
         }
 
-        if (prod && neededBaseQty > prod.stock) {
+        // Cek stok di lokasi yang dipilih
+        let locStock = prod?.stock || 0;
+        if (prod?.stocks && locationId) {
+          const sObj = prod.stocks.find((s) => s.locationId === locationId || s.location?.id === locationId);
+          if (sObj) locStock = sObj.stock;
+        }
+
+        if (prod && neededBaseQty > locStock) {
+          const locName = locations.find((l) => l.id === locationId)?.name || 'outlet';
           setError(
-            `Stok untuk "${prod.name}" tidak mencukupi! Dibutuhkan: ${neededBaseQty} ${prod.unit}, sisa di gudang: ${prod.stock} ${prod.unit}.`
+            `Stok "${prod.name}" di ${locName} tidak mencukupi! Dibutuhkan: ${neededBaseQty} ${prod.unit}, sisa: ${locStock} ${prod.unit}.`
           );
           return;
         }
@@ -264,6 +280,7 @@ export default function SalesModule({ user, onOpenAuth }) {
       const res = await saleService.createSale({
         customerName,
         contactId: contactId || null,
+        locationId: locationId || undefined,
         paymentMethod,
         notes,
         items: payloadItems
@@ -393,6 +410,7 @@ export default function SalesModule({ user, onOpenAuth }) {
               <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 <th className="px-6 py-4">No Invoice</th>
                 <th className="px-6 py-4">Waktu</th>
+                <th className="px-6 py-4">Outlet / Gudang</th>
                 <th className="px-6 py-4">Pelanggan</th>
                 <th className="px-6 py-4">Rincian Item & Satuan Jual</th>
                 <th className="px-6 py-4">Metode Bayar</th>
@@ -412,6 +430,12 @@ export default function SalesModule({ user, onOpenAuth }) {
                       dateStyle: 'medium',
                       timeStyle: 'short'
                     })}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      <Store className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{sale.location?.name || 'Outlet Jomblang'}</span>
+                    </span>
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-900">
                     <div className="flex items-center gap-1.5">
@@ -576,17 +600,35 @@ export default function SalesModule({ user, onOpenAuth }) {
                     );
                   })()}
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Metode Pembayaran</label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden bg-white"
-                  >
-                    <option value="CASH">Tunai (Cash)</option>
-                    <option value="TRANSFER">Transfer Bank</option>
-                    <option value="TEMPO">Kredit / Tempo</option>
-                  </select>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                      Lokasi Pengambilan Stok
+                    </label>
+                    <select
+                      value={locationId}
+                      onChange={(e) => setLocationId(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-emerald-300 bg-emerald-50/50 text-emerald-900 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    >
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name} {loc.code === 'JOMBLANG' ? '(Outlet Penjualan)' : '(Pusat Penyimpanan)'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Metode Pembayaran</label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden bg-white"
+                    >
+                      <option value="CASH">Tunai (Cash)</option>
+                      <option value="TRANSFER">Transfer Bank</option>
+                      <option value="TEMPO">Kredit / Tempo</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -608,7 +650,13 @@ export default function SalesModule({ user, onOpenAuth }) {
                     const ratio = parseFloat(item.itemsPerUnit) || 1;
                     const outgoingBaseUnits = Math.round(sQty * ratio);
                     const subtotal = sQty * (parseFloat(item.unitPrice) || 0);
-                    const isStockInsufficient = currentProd && outgoingBaseUnits > currentProd.stock;
+
+                    let curLocStock = currentProd?.stock || 0;
+                    if (currentProd?.stocks && locationId) {
+                      const sObj = currentProd.stocks.find((s) => s.locationId === locationId || s.location?.id === locationId);
+                      if (sObj) curLocStock = sObj.stock;
+                    }
+                    const isStockInsufficient = currentProd && outgoingBaseUnits > curLocStock;
 
                     return (
                       <div key={index} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
@@ -623,11 +671,18 @@ export default function SalesModule({ user, onOpenAuth }) {
                               className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                             >
                               <option value="" disabled>Pilih Produk...</option>
-                              {products.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  [{p.sku}] {p.name} (Stok: {p.stock} {p.unit || 'buah'})
-                                </option>
-                              ))}
+                              {products.map((p) => {
+                                let curStock = p.stock;
+                                if (p.stocks && locationId) {
+                                  const s = p.stocks.find((st) => st.locationId === locationId || st.location?.id === locationId);
+                                  if (s) curStock = s.stock;
+                                }
+                                return (
+                                  <option key={p.id} value={p.id}>
+                                    [{p.sku}] {p.name} (Stok: {curStock} {p.unit || 'buah'})
+                                  </option>
+                                );
+                              })}
                             </select>
                           </div>
 
