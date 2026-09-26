@@ -11,7 +11,10 @@ import {
   FileText,
   DollarSign,
   TrendingUp,
-  Package
+  Package,
+  Layers,
+  ArrowRight,
+  Boxes
 } from 'lucide-react';
 
 export default function SalesModule({ user, onOpenAuth }) {
@@ -31,7 +34,15 @@ export default function SalesModule({ user, onOpenAuth }) {
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([
-    { productId: '', quantity: 1, unitPrice: 0 }
+    { 
+      productId: '', 
+      unitType: 'base', 
+      saleQty: 1, 
+      saleUnit: 'buah', 
+      itemsPerUnit: 1, 
+      unitPrice: 0,
+      customUnitName: ''
+    }
   ]);
 
   useEffect(() => {
@@ -60,24 +71,108 @@ export default function SalesModule({ user, onOpenAuth }) {
       onOpenAuth();
       return;
     }
+    const defaultProd = products[0];
+    const defaultUnit = defaultProd?.unit || 'buah';
+    const defaultPrice = defaultProd ? parseFloat(defaultProd.price || 0) : 0;
+
     setCustomerName('');
     setPaymentMethod('CASH');
     setNotes('');
-    setItems([{ productId: products[0]?.id || '', quantity: 1, unitPrice: products[0]?.price || 0 }]);
+    setItems([
+      { 
+        productId: defaultProd?.id || '', 
+        unitType: 'base', 
+        saleQty: 1, 
+        saleUnit: defaultUnit, 
+        itemsPerUnit: 1, 
+        unitPrice: defaultPrice,
+        customUnitName: ''
+      }
+    ]);
     setIsModalOpen(true);
   };
 
   const handleProductChange = (index, prodId) => {
     const selected = products.find((p) => p.id === prodId);
+    const baseUnit = selected?.unit || 'buah';
+    const basePrice = selected ? parseFloat(selected.price || 0) : 0;
+
     const newItems = [...items];
     newItems[index].productId = prodId;
-    newItems[index].unitPrice = selected ? parseFloat(selected.price) : 0;
+    newItems[index].unitType = 'base';
+    newItems[index].saleUnit = baseUnit;
+    newItems[index].itemsPerUnit = 1;
+    newItems[index].unitPrice = basePrice;
+    newItems[index].customUnitName = '';
+    setItems(newItems);
+  };
+
+  const handleUnitTypeChange = (index, unitType) => {
+    const newItems = [...items];
+    const item = newItems[index];
+    const prod = products.find((p) => p.id === item.productId);
+    const baseUnit = prod?.unit || 'buah';
+    const basePrice = prod ? parseFloat(prod.price || 0) : 0;
+
+    item.unitType = unitType;
+
+    let targetUnit = baseUnit;
+    let ratio = 1;
+
+    if (unitType === 'base') {
+      targetUnit = baseUnit;
+      ratio = 1;
+    } else if (unitType === 'lusin') {
+      targetUnit = 'lusin';
+      ratio = 12;
+    } else if (unitType === 'pack') {
+      targetUnit = 'pack';
+      ratio = (baseUnit.toLowerCase() === 'pak' || baseUnit.toLowerCase() === 'pack') ? 1 : 10;
+    } else if (unitType === 'kodi') {
+      targetUnit = 'kodi';
+      ratio = 20;
+    } else if (unitType === 'gross') {
+      targetUnit = 'gross';
+      ratio = 144;
+    } else if (unitType === 'dus') {
+      targetUnit = 'dus';
+      ratio = 24;
+    } else if (unitType === 'custom') {
+      targetUnit = item.customUnitName || 'satuan';
+      ratio = item.itemsPerUnit || 1;
+    }
+
+    item.saleUnit = targetUnit;
+    item.itemsPerUnit = ratio;
+    // Set harga jual rekomendasi proporsional dengan rasio satuan
+    item.unitPrice = basePrice * ratio;
+    setItems(newItems);
+  };
+
+  const handleCustomUnitNameChange = (index, name) => {
+    const newItems = [...items];
+    newItems[index].customUnitName = name;
+    newItems[index].saleUnit = name || 'satuan';
+    setItems(newItems);
+  };
+
+  const handleItemsPerUnitChange = (index, ratioVal) => {
+    const newItems = [...items];
+    const item = newItems[index];
+    const prod = products.find((p) => p.id === item.productId);
+    const basePrice = prod ? parseFloat(prod.price || 0) : 0;
+
+    const ratio = parseFloat(ratioVal) || 1;
+    item.itemsPerUnit = ratio;
+
+    // Jika harga masih proporsional dengan harga dasar, update otomatis
+    item.unitPrice = basePrice * ratio;
     setItems(newItems);
   };
 
   const handleQuantityChange = (index, qty) => {
     const newItems = [...items];
-    newItems[index].quantity = parseInt(qty) || 1;
+    newItems[index].saleQty = parseFloat(qty) || 0;
     setItems(newItems);
   };
 
@@ -89,9 +184,20 @@ export default function SalesModule({ user, onOpenAuth }) {
 
   const handleAddItem = () => {
     const defaultProd = products[0];
+    const defaultUnit = defaultProd?.unit || 'buah';
+    const defaultPrice = defaultProd ? parseFloat(defaultProd.price || 0) : 0;
+
     setItems([
       ...items,
-      { productId: defaultProd?.id || '', quantity: 1, unitPrice: defaultProd?.price || 0 }
+      { 
+        productId: defaultProd?.id || '', 
+        unitType: 'base', 
+        saleQty: 1, 
+        saleUnit: defaultUnit, 
+        itemsPerUnit: 1, 
+        unitPrice: defaultPrice,
+        customUnitName: ''
+      }
     ]);
   };
 
@@ -101,19 +207,58 @@ export default function SalesModule({ user, onOpenAuth }) {
   };
 
   const calculateTotal = () => {
-    return items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+    return items.reduce((acc, item) => acc + ((parseFloat(item.saleQty) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
+  };
+
+  const calculateTotalBaseUnits = () => {
+    return items.reduce((acc, item) => acc + Math.round((parseFloat(item.saleQty) || 0) * (parseFloat(item.itemsPerUnit) || 1)), 0);
   };
 
   const handleSubmitSale = async (e) => {
     e.preventDefault();
     try {
       setError('');
+
+      // Validasi ketersediaan stok sebelum submit
+      for (const item of items) {
+        const prod = products.find((p) => p.id === item.productId);
+        const sQty = parseFloat(item.saleQty) || 0;
+        const ratio = parseFloat(item.itemsPerUnit) || 1;
+        const neededBaseQty = Math.round(sQty * ratio);
+
+        if (sQty <= 0) {
+          setError('Jumlah penjualan (Qty) harus lebih dari 0.');
+          return;
+        }
+
+        if (prod && neededBaseQty > prod.stock) {
+          setError(
+            `Stok untuk "${prod.name}" tidak mencukupi! Dibutuhkan: ${neededBaseQty} ${prod.unit}, sisa di gudang: ${prod.stock} ${prod.unit}.`
+          );
+          return;
+        }
+      }
+
+      const payloadItems = items.map((item) => {
+        const sQty = parseFloat(item.saleQty) || 1;
+        const ratio = parseFloat(item.itemsPerUnit) || 1;
+        return {
+          productId: item.productId,
+          saleQty: sQty,
+          saleUnit: item.saleUnit || 'buah',
+          itemsPerUnit: ratio,
+          quantity: Math.round(sQty * ratio),
+          unitPrice: parseFloat(item.unitPrice) || 0
+        };
+      });
+
       const res = await saleService.createSale({
         customerName,
         paymentMethod,
         notes,
-        items
+        items: payloadItems
       });
+
       setSuccessMsg(`Penjualan berhasil dicatat! No Invoice: ${res.data.data.invoiceNo}`);
       setIsModalOpen(false);
       fetchData();
@@ -136,7 +281,7 @@ export default function SalesModule({ user, onOpenAuth }) {
   const totalRevenue = sales.reduce((acc, s) => acc + parseFloat(s.totalAmount || 0), 0);
   const totalTransactions = sales.length;
   const totalItemsSold = sales.reduce(
-    (acc, s) => acc + s.items.reduce((sum, item) => sum + item.quantity, 0),
+    (acc, s) => acc + s.items.reduce((sum, item) => sum + (item.quantity || 0), 0),
     0
   );
 
@@ -189,8 +334,8 @@ export default function SalesModule({ user, onOpenAuth }) {
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-500">Total Produk Terjual</p>
-            <p className="text-2xl font-bold text-slate-900 mt-1">{totalItemsSold.toLocaleString('id-ID')} <span className="text-sm font-normal text-slate-500">pcs</span></p>
+            <p className="text-sm font-medium text-slate-500">Total Fisik Terjual</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{totalItemsSold.toLocaleString('id-ID')} <span className="text-sm font-normal text-slate-500">unit (buah/pak)</span></p>
           </div>
           <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
             <ShoppingCart className="w-6 h-6" />
@@ -239,10 +384,11 @@ export default function SalesModule({ user, onOpenAuth }) {
                 <th className="px-6 py-4">No Invoice</th>
                 <th className="px-6 py-4">Waktu</th>
                 <th className="px-6 py-4">Pelanggan</th>
+                <th className="px-6 py-4">Rincian Item & Satuan Jual</th>
                 <th className="px-6 py-4">Metode Bayar</th>
                 <th className="px-6 py-4">Total Penjualan</th>
                 <th className="px-6 py-4">Petugas</th>
-                <th className="px-6 py-4 text-right">Rincian Item</th>
+                <th className="px-6 py-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -262,6 +408,23 @@ export default function SalesModule({ user, onOpenAuth }) {
                     {sale.notes && (
                       <span className="block text-xs text-slate-400">{sale.notes}</span>
                     )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="space-y-1">
+                      {sale.items.map((it, idx) => (
+                        <div key={idx} className="text-xs text-slate-700">
+                          <span className="font-semibold text-slate-900">{it.product?.name}:</span>{' '}
+                          <span className="font-mono bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-semibold border border-emerald-200">
+                            {Number(it.saleQty || it.quantity)} {it.saleUnit || it.product?.unit || 'buah'}
+                          </span>{' '}
+                          {it.saleUnit && it.product?.unit && it.saleUnit.toLowerCase() !== it.product.unit.toLowerCase() && (
+                            <span className="text-slate-400 font-mono text-[11px]">
+                              (×{Number(it.itemsPerUnit || 1)} = {it.quantity} {it.product.unit})
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
@@ -285,7 +448,7 @@ export default function SalesModule({ user, onOpenAuth }) {
                       onClick={() => setSelectedSaleDetail(sale)}
                       className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
                     >
-                      Lihat {sale.items.length} Item
+                      Detail
                     </button>
                   </td>
                 </tr>
@@ -293,7 +456,7 @@ export default function SalesModule({ user, onOpenAuth }) {
 
               {filteredSales.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan="8" className="px-6 py-12 text-center text-slate-400">
                     <ShoppingCart className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                     <p className="font-medium">Belum ada riwayat transaksi penjualan.</p>
                   </td>
@@ -302,7 +465,7 @@ export default function SalesModule({ user, onOpenAuth }) {
 
               {loading && (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
                     <p className="text-sm">Memuat riwayat penjualan...</p>
                   </td>
@@ -313,14 +476,24 @@ export default function SalesModule({ user, onOpenAuth }) {
         </div>
       </div>
 
-      {/* Modal: Catat Penjualan Baru */}
+      {/* Modal: Catat Penjualan Baru dengan Pilihan Multi-Satuan */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Catat Transaksi Penjualan</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Stok produk akan berkurang secara otomatis dan tercatat pada kartu stok barang.
-            </p>
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Catat Transaksi Penjualan</h3>
+                <p className="text-xs text-slate-500">
+                  Dapat memilih satuan penjualan (misal: <strong>Lusin</strong>, <strong>Pack</strong>, <strong>Kodi</strong>, dsb). Stok otomatis dikonversi dan dipotong dari gudang.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
 
             <form onSubmit={handleSubmitSale} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -349,74 +522,183 @@ export default function SalesModule({ user, onOpenAuth }) {
                 </div>
               </div>
 
-              {/* Items List */}
+              {/* Items List with Multi-Unit & Conversion */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase mb-2">Item Barang yang Dijual</label>
-                <div className="space-y-2.5">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-slate-700 uppercase flex items-center gap-1.5">
+                    <Boxes className="w-4 h-4 text-emerald-600" /> Item Penjualan & Satuan
+                  </label>
+                  <span className="text-[11px] text-slate-400">Pilih Lusin, Pack, Kodi, atau Satuan Dasar</span>
+                </div>
+
+                <div className="space-y-3">
                   {items.map((item, index) => {
                     const currentProd = products.find((p) => p.id === item.productId);
-                    const subtotal = item.quantity * item.unitPrice;
+                    const baseUnit = currentProd?.unit || 'buah';
+                    const basePrice = currentProd ? parseFloat(currentProd.price || 0) : 0;
+                    const sQty = parseFloat(item.saleQty) || 0;
+                    const ratio = parseFloat(item.itemsPerUnit) || 1;
+                    const outgoingBaseUnits = Math.round(sQty * ratio);
+                    const subtotal = sQty * (parseFloat(item.unitPrice) || 0);
+                    const isStockInsufficient = currentProd && outgoingBaseUnits > currentProd.stock;
 
                     return (
-                      <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row gap-2.5 items-center">
-                        <div className="flex-1 w-full sm:w-auto">
-                          <select
-                            required
-                            value={item.productId}
-                            onChange={(e) => handleProductChange(index, e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                          >
-                            <option value="" disabled>Pilih Produk...</option>
-                            {products.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                [{p.sku}] {p.name} (Sisa: {p.stock} {p.unit || 'buah'})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                      <div key={index} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                        <div className="flex flex-col sm:flex-row gap-2.5 items-start sm:items-center">
+                          {/* Product Selection */}
+                          <div className="flex-1 w-full sm:w-auto">
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Produk</label>
+                            <select
+                              required
+                              value={item.productId}
+                              onChange={(e) => handleProductChange(index, e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                            >
+                              <option value="" disabled>Pilih Produk...</option>
+                              {products.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  [{p.sku}] {p.name} (Stok: {p.stock} {p.unit || 'buah'})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
 
-                        <div className="w-28">
-                          <div className="relative">
+                          {/* Unit Selection Dropdown */}
+                          <div className="w-full sm:w-40">
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Satuan Jual</label>
+                            <select
+                              value={item.unitType}
+                              onChange={(e) => handleUnitTypeChange(index, e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-emerald-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                            >
+                              <option value="base">{baseUnit.toUpperCase()} (Dasar)</option>
+                              <option value="lusin">Lusin (12 {baseUnit})</option>
+                              <option value="pack">Pack / Pak</option>
+                              <option value="kodi">Kodi (20 {baseUnit})</option>
+                              <option value="gross">Gross (144 {baseUnit})</option>
+                              <option value="dus">Dus / Karton</option>
+                              <option value="custom">Satuan Kustom...</option>
+                            </select>
+                          </div>
+
+                          {/* Qty in chosen unit */}
+                          <div className="w-full sm:w-24">
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Jumlah</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                required
+                                step="any"
+                                min="0.01"
+                                placeholder="Qty"
+                                value={item.saleQty}
+                                onChange={(e) => handleQuantityChange(index, e.target.value)}
+                                className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Items Per Unit (Ratio) */}
+                          <div className="w-full sm:w-28">
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">
+                              Isi per {item.saleUnit || 'unit'}
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                required
+                                step="any"
+                                min="0.01"
+                                disabled={item.unitType === 'base'}
+                                placeholder="Isi"
+                                value={item.itemsPerUnit}
+                                onChange={(e) => handleItemsPerUnitChange(index, e.target.value)}
+                                className={`w-full px-2 py-1.5 rounded-lg text-xs font-semibold text-center focus:ring-2 focus:ring-blue-500 focus:outline-hidden ${
+                                  item.unitType === 'base'
+                                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                                    : 'bg-white border border-blue-300 text-blue-800'
+                                }`}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Unit Price per chosen unit */}
+                          <div className="w-full sm:w-32">
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">
+                              Harga / {item.saleUnit || 'unit'} (Rp)
+                            </label>
                             <input
                               type="number"
                               required
-                              min="1"
-                              max={currentProd ? currentProd.stock : undefined}
-                              placeholder="Qty"
-                              value={item.quantity}
-                              onChange={(e) => handleQuantityChange(index, e.target.value)}
-                              className="w-full pl-2.5 pr-10 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-center focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                              min="0"
+                              placeholder="Harga Jual"
+                              value={item.unitPrice}
+                              onChange={(e) => handlePriceChange(index, e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                             />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-semibold pointer-events-none">
-                              {currentProd?.unit || 'buah'}
-                            </span>
+                          </div>
+
+                          <div className="pt-4 hidden sm:block">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(index)}
+                              disabled={items.length === 1}
+                              className="p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-30 rounded-lg"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
 
-                        <div className="w-32">
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            placeholder="Harga Jual"
-                            value={item.unitPrice}
-                            onChange={(e) => handlePriceChange(index, e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                          />
-                        </div>
+                        {/* Optional Custom Unit Name Input */}
+                        {item.unitType === 'custom' && (
+                          <div className="flex items-center gap-2 p-2 bg-amber-50/80 border border-amber-200 rounded-lg text-xs">
+                            <label className="font-semibold text-amber-900 whitespace-nowrap">Nama Satuan Kustom:</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Misal: Bal, Roll, Karung, Ikat"
+                              value={item.customUnitName}
+                              onChange={(e) => handleCustomUnitNameChange(index, e.target.value)}
+                              className="flex-1 px-2.5 py-1 bg-white border border-amber-300 rounded text-xs focus:ring-1 focus:ring-amber-500 focus:outline-hidden"
+                            />
+                            <span className="text-slate-500 text-[11px]">(Contoh: 1 Bal = 50 pak)</span>
+                          </div>
+                        )}
 
-                        <div className="w-28 text-right font-bold text-xs text-slate-800">
-                          Rp {subtotal.toLocaleString('id-ID')}
-                        </div>
+                        {/* Visual Stock Deduction & Subtotal Feedback Banner */}
+                        <div className={`p-2 rounded-lg flex flex-wrap items-center justify-between text-xs gap-2 border ${
+                          isStockInsufficient 
+                            ? 'bg-red-50 border-red-200 text-red-700' 
+                            : 'bg-emerald-50/70 border-emerald-200/80 text-slate-700'
+                        }`}>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold">Potong Stok:</span>
+                            <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 font-semibold text-slate-800">
+                              {item.saleQty} {item.saleUnit} {item.unitType !== 'base' && `(× ${item.itemsPerUnit} ${baseUnit})`}
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                            <span className={`font-bold px-2 py-0.5 rounded border ${
+                              isStockInsufficient
+                                ? 'bg-red-100 text-red-800 border-red-300'
+                                : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                            }`}>
+                              -{outgoingBaseUnits.toLocaleString('id-ID')} {baseUnit}
+                            </span>
+                            {currentProd && (
+                              <span className={`text-[11px] font-medium ${isStockInsufficient ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
+                                {isStockInsufficient 
+                                  ? `⚠️ Stok Tidak Cukup! (Sisa: ${currentProd.stock} ${baseUnit})` 
+                                  : `(Sisa nanti: ${currentProd.stock - outgoingBaseUnits} ${baseUnit})`
+                                }
+                              </span>
+                            )}
+                          </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(index)}
-                          disabled={items.length === 1}
-                          className="p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-30 rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          <div className="font-bold text-slate-900 text-right">
+                            Subtotal: Rp {subtotal.toLocaleString('id-ID')}
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -425,10 +707,10 @@ export default function SalesModule({ user, onOpenAuth }) {
                 <button
                   type="button"
                   onClick={handleAddItem}
-                  className="mt-2.5 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
+                  className="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1.5"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  <span>Tambah Baris Produk</span>
+                  <span>Tambah Baris Produk Lain</span>
                 </button>
               </div>
 
@@ -436,7 +718,7 @@ export default function SalesModule({ user, onOpenAuth }) {
                 <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Catatan Transaksi</label>
                 <input
                   type="text"
-                  placeholder="Catatan pengiriman, no resi, dll."
+                  placeholder="Catatan pengiriman, no resi, info pesanan, dll."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
@@ -444,14 +726,22 @@ export default function SalesModule({ user, onOpenAuth }) {
               </div>
 
               {/* Total Summary */}
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
-                <span className="text-sm font-semibold text-emerald-800">Total Tagihan Penjualan:</span>
-                <span className="text-xl font-bold text-emerald-900">
-                  Rp {calculateTotal().toLocaleString('id-ID')}
-                </span>
+              <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-slate-500 block">Total Fisik Barang Terjual:</span>
+                  <span className="text-base font-bold text-emerald-900">
+                    -{calculateTotalBaseUnits().toLocaleString('id-ID')} unit (buah/pak)
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-500 block">Total Tagihan Penjualan:</span>
+                  <span className="text-xl font-bold text-emerald-900">
+                    Rp {calculateTotal().toLocaleString('id-ID')}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3">
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -478,11 +768,11 @@ export default function SalesModule({ user, onOpenAuth }) {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div>
                 <h3 className="font-bold text-base text-slate-900">Rincian Faktur Penjualan</h3>
-                <p className="text-xs font-mono text-blue-600">{selectedSaleDetail.invoiceNo}</p>
+                <p className="text-xs font-mono text-emerald-600 font-semibold">{selectedSaleDetail.invoiceNo}</p>
               </div>
               <button
                 onClick={() => setSelectedSaleDetail(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1"
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1 rounded-lg"
               >
                 ✕
               </button>
@@ -497,13 +787,22 @@ export default function SalesModule({ user, onOpenAuth }) {
 
             <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
               {selectedSaleDetail.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg text-xs">
-                  <div>
-                    <span className="font-semibold text-slate-800">{item.product.name}</span>
-                    <span className="block text-[11px] text-slate-400">{item.quantity} {item.product?.unit || 'buah'} @ Rp {Number(item.unitPrice).toLocaleString('id-ID')}</span>
+                <div key={item.id} className="p-3 bg-slate-50 rounded-xl text-xs space-y-1 border border-slate-100">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-800">{item.product?.name}</span>
+                    <span className="font-bold text-slate-900">Rp {Number(item.subtotal).toLocaleString('id-ID')}</span>
                   </div>
-                  <div className="font-bold text-slate-900">
-                    Rp {Number(item.subtotal).toLocaleString('id-ID')}
+                  <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                    <span>
+                      Terjual: <strong className="text-slate-800">{Number(item.saleQty || item.quantity)} {item.saleUnit || item.product?.unit || 'buah'}</strong>
+                      {' '}@ Rp {Number(item.unitPrice).toLocaleString('id-ID')}
+                      {item.saleUnit && item.product?.unit && item.saleUnit.toLowerCase() !== item.product.unit.toLowerCase() && (
+                        <span className="text-slate-400"> (×{Number(item.itemsPerUnit || 1)} = {item.quantity} {item.product.unit})</span>
+                      )}
+                    </span>
+                    <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                      -{item.quantity} {item.product?.unit || 'buah'}
+                    </span>
                   </div>
                 </div>
               ))}

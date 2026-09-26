@@ -44,10 +44,11 @@ exports.createSale = async (req, res) => {
 
       // Validasi setiap item & ketersediaan stok
       for (const item of items) {
-        const qty = parseInt(item.quantity);
+        // Mendukung transaksi penjualan dalam berbagai satuan (misal: lusin, pack, kodi, pcs, dll.)
+        const sQty = parseFloat(item.saleQty !== undefined ? item.saleQty : item.quantity);
         const price = parseFloat(item.unitPrice);
 
-        if (!item.productId || isNaN(qty) || qty <= 0 || isNaN(price) || price < 0) {
+        if (!item.productId || isNaN(sQty) || sQty <= 0 || isNaN(price) || price < 0) {
           throw new Error('Data item penjualan tidak valid (periksa produk, qty, dan harga).');
         }
 
@@ -59,26 +60,40 @@ exports.createSale = async (req, res) => {
           throw new Error(`Produk dengan ID ${item.productId} tidak ditemukan.`);
         }
 
-        if (product.stock < qty) {
-          throw new Error(`Stok "${product.name}" tidak mencukupi! Sisa stok: ${product.stock} pcs, diminta: ${qty} pcs.`);
+        const itemsPerUnit = parseFloat(item.itemsPerUnit !== undefined ? item.itemsPerUnit : 1);
+        const saleUnit = item.saleUnit || product.unit || 'buah';
+        const baseQty = Math.round(sQty * itemsPerUnit);
+
+        if (product.stock < baseQty) {
+          throw new Error(
+            `Stok "${product.name}" tidak mencukupi! Sisa stok: ${product.stock} ${product.unit}, dibutuhkan: ${baseQty} ${product.unit} (${sQty} ${saleUnit}).`
+          );
         }
 
-        const subtotal = qty * price;
+        const subtotal = sQty * price;
         totalAmount += subtotal;
 
         saleItemsData.push({
           productId: product.id,
-          quantity: qty,
+          saleQty: sQty,
+          saleUnit: saleUnit,
+          itemsPerUnit: itemsPerUnit,
+          quantity: baseQty,
           unitPrice: price,
           subtotal
         });
 
-        // Simpan rencana pembaruan stok
+        // Detail mutasi untuk kartu stok
+        const noteDetail = saleUnit.toLowerCase() !== (product.unit || 'buah').toLowerCase()
+          ? ` [${sQty} ${saleUnit} x ${itemsPerUnit} = -${baseQty} ${product.unit}]`
+          : ` [-${baseQty} ${product.unit}]`;
+
         stockUpdates.push({
           productId: product.id,
           productName: product.name,
-          newStock: product.stock - qty,
-          quantity: qty
+          newStock: product.stock - baseQty,
+          quantity: baseQty,
+          noteDetail
         });
       }
 
@@ -119,7 +134,7 @@ exports.createSale = async (req, res) => {
             productId: update.productId,
             type: 'STOCK_OUT',
             quantity: update.quantity,
-            notes: `Penjualan #${invoiceNo} (${customerName})`
+            notes: `Penjualan #${invoiceNo} (${customerName})${update.noteDetail}`
           }
         });
       }

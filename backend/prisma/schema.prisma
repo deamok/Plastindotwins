@@ -73,15 +73,18 @@ model Sale {
 }
 
 model SaleItem {
-  id        String   @id @default(uuid())
-  saleId    String
-  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product  @relation(fields: [productId], references: [id])
-  quantity  Int      // Jumlah terjual dalam satuan jual (buah/pak)
-  unitPrice Decimal  @db.Decimal(10, 2) // Harga per buah/pak
-  subtotal  Decimal  @db.Decimal(12, 2)
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  saleId       String
+  sale         Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+  saleQty      Decimal  @default(1) @db.Decimal(10, 2) // Jumlah yang dijual dalam satuan terpilih (misal: 2 lusin atau 5 pack)
+  saleUnit     String   @default("buah") // Satuan transaksi penjualan: buah, pcs, lusin, pak/pack, kodi, dus, dll.
+  itemsPerUnit Decimal  @default(1) @db.Decimal(10, 2) // Rasio konversi: berapa unit stok dasar per 1 satuan penjualan (misal: 12 untuk lusin, 50 untuk pack)
+  quantity     Int      // Total unit stok fisik yang berkurang dalam satuan dasar produk (buah/pak)
+  unitPrice    Decimal  @db.Decimal(10, 2) // Harga per satuan transaksi terpilih
+  subtotal     Decimal  @db.Decimal(12, 2) // saleQty * unitPrice
+  createdAt    DateTime @default(now())
 }
 
 model Purchase {
