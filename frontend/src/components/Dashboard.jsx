@@ -769,9 +769,6 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                     <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       <th className="px-5 py-4">SKU</th>
                       <th className="px-5 py-4">Nama Produk</th>
-                      <th className="px-5 py-4">Satuan & Konversi</th>
-                      <th className="px-5 py-4">Harga Jual</th>
-                      <th className="px-5 py-4">Beli Modal</th>
                       <th className="px-5 py-4">Stok Fisik per Gudang</th>
                       <th className="px-5 py-4">Status</th>
                       <th className="px-5 py-4 text-center">Aksi / Edit</th>
@@ -780,9 +777,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {filteredProducts.map((product) => {
                       const isLowStock = product.stock <= product.minStock;
-                      const ratio = Number(product.itemsPerPurchaseUnit) || 1;
                       const unit = product.unit || 'buah';
-                      const pUnit = product.purchaseUnit || 'kg';
 
                       const stockB = getProductStockInLoc(product, 'BANGETAYU');
                       const stockJ = getProductStockInLoc(product, 'JOMBLANG');
@@ -797,20 +792,6 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                             {product.description && (
                               <div className="text-xs text-slate-500 line-clamp-1">{product.description}</div>
                             )}
-                          </td>
-                          <td className="px-5 py-4 whitespace-nowrap">
-                            <div className="text-xs space-y-0.5">
-                              <div>Jual: <span className="font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">{unit}</span></div>
-                              <div className="text-[11px] text-blue-700 font-mono">1 {pUnit} = {ratio} {unit}</div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4 whitespace-nowrap font-medium text-slate-800">
-                            Rp {Number(product.price).toLocaleString('id-ID')}
-                            <span className="text-[11px] text-slate-400 block">/{unit}</span>
-                          </td>
-                          <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-500">
-                            Rp {Number(product.costPrice || 0).toLocaleString('id-ID')}
-                            <span className="text-[10px] text-slate-400 block">/{pUnit}</span>
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap">
                             <div className="space-y-1">
@@ -842,12 +823,12 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                             )}
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap text-center">
-                            <div className="inline-flex items-center gap-1">
+                            <div className="inline-flex items-center gap-1.5 justify-center">
                               {/* Tombol Edit Barang di Stok */}
                               <button
                                 onClick={() => openEditModal(product)}
-                                title="Edit Barang & Stok"
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 flex items-center gap-1 text-xs font-semibold"
+                                title="Edit Data & Stok Barang"
+                                className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors border border-blue-200 flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
                               >
                                 <Edit3 className="w-4 h-4 text-blue-600" />
                                 <span>Edit</span>
@@ -857,27 +838,10 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                               <button
                                 onClick={() => openTransferModal(product)}
                                 title="Mutasi Stok Produk Ini Antar Gudang"
-                                className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-200"
+                                className="px-2.5 py-1.5 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors border border-indigo-200 flex items-center gap-1 text-xs font-semibold shadow-2xs"
                               >
                                 <ArrowLeftRight className="w-4 h-4" />
-                              </button>
-
-                              {/* Tombol Masuk */}
-                              <button
-                                onClick={() => openAdjustModal(product, 'STOCK_IN')}
-                                title="Barang Masuk"
-                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-100"
-                              >
-                                <ArrowDownCircle className="w-4 h-4" />
-                              </button>
-
-                              {/* Tombol Keluar */}
-                              <button
-                                onClick={() => openAdjustModal(product, 'STOCK_OUT')}
-                                title="Barang Keluar"
-                                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors border border-amber-100"
-                              >
-                                <ArrowUpCircle className="w-4 h-4" />
+                                <span>Mutasi</span>
                               </button>
                             </div>
                           </td>
@@ -887,7 +851,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
 
                     {filteredProducts.length === 0 && !loading && (
                       <tr>
-                        <td colSpan="8" className="px-6 py-12 text-center text-slate-400">
+                        <td colSpan="5" className="px-6 py-12 text-center text-slate-400">
                           <Package className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                           <p className="font-medium">
                             {!user ? 'Silakan login untuk memuat daftar produk' : 'Tidak ada produk ditemukan.'}
@@ -901,7 +865,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
 
                     {loading && (
                       <tr>
-                        <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
+                        <td colSpan="5" className="px-6 py-12 text-center text-slate-500">
                           <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
                           <p className="text-sm">Memuat data produk...</p>
                         </td>
