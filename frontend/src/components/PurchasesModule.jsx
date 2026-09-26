@@ -564,7 +564,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                               <option value="" disabled>Pilih Produk...</option>
                               {products.map((p) => (
                                 <option key={p.id} value={p.id}>
-                                  [{p.sku}] {p.name} (Dijual dlm: {p.unit || 'buah'})
+                                  [{p.sku}] {p.name} {p.category ? `• ${p.category}` : ''} (Dijual dlm: {p.unit || 'buah'})
                                 </option>
                               ))}
                             </select>

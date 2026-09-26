@@ -679,7 +679,7 @@ export default function SalesModule({ user, onOpenAuth }) {
                                 }
                                 return (
                                   <option key={p.id} value={p.id}>
-                                    [{p.sku}] {p.name} (Stok: {curStock} {p.unit || 'buah'})
+                                    [{p.sku}] {p.name} {p.category ? `• ${p.category}` : ''} (Stok: {curStock} {p.unit || 'buah'})
                                   </option>
                                 );
                               })}

@@ -81,6 +81,8 @@ model Product {
   id                   String          @id @default(uuid())
   sku                  String          @unique
   name                 String
+  category             String?
+  subCategory          String?
   description          String?
   stock                Int             @default(0) // Total stok gabungan semua lokasi (dalam satuan jual: buah/pak/pcs)
   minStock             Int             @default(5)
@@ -96,6 +98,9 @@ model Product {
   stockTransfers       StockTransfer[]
   saleItems            SaleItem[]
   purchaseItems        PurchaseItem[]
+
+  @@index([category])
+  @@index([subCategory])
 }
 
 model ProductStock {

@@ -36,6 +36,9 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
   const [products, setProducts] = useState([]);
   const [locations, setLocations] = useState([]);
   const [selectedLocationFilter, setSelectedLocationFilter] = useState('ALL'); // 'ALL', 'BANGETAYU', 'JOMBLANG'
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedSubCategory, setSelectedSubCategory] = useState('ALL');
+  const [categoriesList, setCategoriesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -57,6 +60,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
   const [newProduct, setNewProduct] = useState({
     sku: '',
     name: '',
+    category: '',
+    subCategory: '',
     description: '',
     stockBangetayu: 0,
     stockJomblang: 0,
@@ -73,6 +78,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
     id: '',
     sku: '',
     name: '',
+    category: '',
+    subCategory: '',
     description: '',
     stockBangetayu: 0,
     stockJomblang: 0,
@@ -117,12 +124,27 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
     try {
       setLoading(true);
       setError('');
-      const [prodRes, locRes] = await Promise.all([
+      const [prodRes, locRes, catRes] = await Promise.all([
         productService.getProducts(),
-        locationService.getLocations().catch(() => ({ data: { data: [] } }))
+        locationService.getLocations().catch(() => ({ data: { data: [] } })),
+        productService.getCategories().catch(() => ({ data: { data: [] } }))
       ]);
-      setProducts(prodRes.data.data || []);
+      const fetchedProducts = prodRes.data.data || [];
+      setProducts(fetchedProducts);
       setLocations(locRes.data.data || []);
+
+      if (catRes.data?.data && catRes.data.data.length > 0) {
+        setCategoriesList(catRes.data.data);
+      } else {
+        const catMap = {};
+        fetchedProducts.forEach((p) => {
+          if (p.category) {
+            if (!catMap[p.category]) catMap[p.category] = new Set();
+            if (p.subCategory) catMap[p.category].add(p.subCategory);
+          }
+        });
+        setCategoriesList(Object.keys(catMap).map((k) => ({ category: k, subCategories: Array.from(catMap[k]) })));
+      }
     } catch (err) {
       if (!err.response) {
         setError('Gagal terhubung ke server (Network Error). Pastikan server backend sedang aktif.');
@@ -177,6 +199,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       setError('');
       await productService.createProduct({
         ...newProduct,
+        category: newProduct.category || null,
+        subCategory: newProduct.subCategory || null,
         stockBangetayu: parseInt(newProduct.stockBangetayu) || 0,
         stockJomblang: parseInt(newProduct.stockJomblang) || 0,
         minStock: parseInt(newProduct.minStock) || 5,
@@ -189,6 +213,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       setNewProduct({
         sku: '',
         name: '',
+        category: '',
+        subCategory: '',
         description: '',
         stockBangetayu: 0,
         stockJomblang: 0,
@@ -224,6 +250,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       id: product.id,
       sku: product.sku || '',
       name: product.name || '',
+      category: product.category || '',
+      subCategory: product.subCategory || '',
       description: product.description || '',
       stockBangetayu: stockB,
       stockJomblang: stockJ,
@@ -246,6 +274,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       await productService.updateProduct(editProductForm.id, {
         sku: editProductForm.sku,
         name: editProductForm.name,
+        category: editProductForm.category || null,
+        subCategory: editProductForm.subCategory || null,
         description: editProductForm.description,
         minStock: parseInt(editProductForm.minStock) || 5,
         unit: editProductForm.unit,
@@ -378,11 +408,17 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
 
   // --- Filtering & Metrics Calculation ---
   const filteredProducts = products.filter((p) => {
+    const sTerm = search.toLowerCase();
     const matchesSearch = 
-      p.name.toLowerCase().includes(search.toLowerCase()) || 
-      p.sku.toLowerCase().includes(search.toLowerCase()) ||
-      (p.description && p.description.toLowerCase().includes(search.toLowerCase()));
-    
+      p.name.toLowerCase().includes(sTerm) || 
+      p.sku.toLowerCase().includes(sTerm) ||
+      (p.category && p.category.toLowerCase().includes(sTerm)) ||
+      (p.subCategory && p.subCategory.toLowerCase().includes(sTerm)) ||
+      (p.description && p.description.toLowerCase().includes(sTerm));
+
+    const matchesCategory = selectedCategory === 'ALL' || p.category === selectedCategory;
+    const matchesSubCategory = selectedSubCategory === 'ALL' || p.subCategory === selectedSubCategory;
+
     // Cek stok berdasarkan filter lokasi
     let currentStock = p.stock || 0;
     if (selectedLocationFilter !== 'ALL') {
@@ -390,7 +426,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
     }
 
     const matchesLowStock = onlyLowStock ? currentStock <= p.minStock : true;
-    return matchesSearch && matchesLowStock;
+    return matchesSearch && matchesCategory && matchesSubCategory && matchesLowStock;
   });
 
   const totalProducts = products.length;
@@ -717,48 +753,128 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
             </div>
 
             {/* Action & Filter Toolbar */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs mb-6 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-              <div className="flex flex-1 items-center gap-3">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Cari SKU atau nama produk..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs mb-6 space-y-3">
+              <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+                <div className="flex flex-1 flex-wrap items-center gap-2.5">
+                  <div className="relative flex-1 min-w-[200px] max-w-md">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Cari SKU, nama, warna, ukuran..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+
+                  {/* Filter Kategori */}
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      setSelectedSubCategory('ALL');
+                    }}
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  >
+                    <option value="ALL">Semua Kategori ({products.length})</option>
+                    {categoriesList.map((c) => (
+                      <option key={c.category} value={c.category}>
+                        {c.category}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Filter Sub-Kategori (Muncul jika kategori dipilih) */}
+                  {selectedCategory !== 'ALL' && (
+                    <select
+                      value={selectedSubCategory}
+                      onChange={(e) => setSelectedSubCategory(e.target.value)}
+                      className="px-3 py-2 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    >
+                      <option value="ALL">Semua Sub-Kategori</option>
+                      {categoriesList
+                        .find((c) => c.category === selectedCategory)
+                        ?.subCategories.map((sc) => (
+                          <option key={sc} value={sc}>
+                            {sc}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+
+                  <button
+                    onClick={() => setOnlyLowStock(!onlyLowStock)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-medium border flex items-center gap-1.5 transition-all ${
+                      onlyLowStock 
+                        ? 'bg-amber-100 border-amber-300 text-amber-800' 
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>Low Stock Saja</span>
+                  </button>
                 </div>
-                <button
-                  onClick={() => setOnlyLowStock(!onlyLowStock)}
-                  className={`px-3.5 py-2 rounded-xl text-sm font-medium border flex items-center gap-2 transition-all ${
-                    onlyLowStock 
-                      ? 'bg-amber-100 border-amber-300 text-amber-800' 
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <Filter className="w-4 h-4" />
-                  <span>Low Stock Saja</span>
-                </button>
+
+                <div className="flex items-center gap-2.5 self-end md:self-auto">
+                  <button
+                    onClick={fetchInventory}
+                    disabled={loading}
+                    title="Refresh"
+                    className="p-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+                  </button>
+                  <button
+                    onClick={handleOpenAddModal}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Tambah Produk</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={fetchInventory}
-                  disabled={loading}
-                  title="Refresh"
-                  className="p-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
-                </button>
-                <button
-                  onClick={handleOpenAddModal}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Tambah Produk</span>
-                </button>
-              </div>
+              {/* Status filter aktif */}
+              {(selectedCategory !== 'ALL' || selectedSubCategory !== 'ALL' || search || onlyLowStock) && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 pt-1 border-t border-slate-100 flex-wrap">
+                  <span>Filter Aktif:</span>
+                  {selectedCategory !== 'ALL' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-medium">
+                      Kategori: {selectedCategory}
+                      <button onClick={() => { setSelectedCategory('ALL'); setSelectedSubCategory('ALL'); }} className="hover:text-blue-950 font-bold ml-0.5">×</button>
+                    </span>
+                  )}
+                  {selectedSubCategory !== 'ALL' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 font-medium">
+                      Sub: {selectedSubCategory}
+                      <button onClick={() => setSelectedSubCategory('ALL')} className="hover:text-indigo-950 font-bold ml-0.5">×</button>
+                    </span>
+                  )}
+                  {search && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
+                      Cari: &ldquo;{search}&rdquo;
+                      <button onClick={() => setSearch('')} className="hover:text-slate-900 font-bold ml-0.5">×</button>
+                    </span>
+                  )}
+                  {onlyLowStock && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-medium">
+                      Low Stock
+                      <button onClick={() => setOnlyLowStock(false)} className="hover:text-amber-950 font-bold ml-0.5">×</button>
+                    </span>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('ALL');
+                      setSelectedSubCategory('ALL');
+                      setSearch('');
+                      setOnlyLowStock(false);
+                    }}
+                    className="text-red-600 hover:underline text-xs ml-auto font-medium"
+                  >
+                    Reset Filter
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Inventory Table */}
@@ -768,7 +884,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                   <thead>
                     <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       <th className="px-5 py-4">SKU</th>
-                      <th className="px-5 py-4">Nama Produk</th>
+                      <th className="px-5 py-4">Nama Produk & Kategori</th>
                       <th className="px-5 py-4">Stok Fisik per Gudang</th>
                       <th className="px-5 py-4">Status</th>
                       <th className="px-5 py-4 text-center">Aksi / Edit</th>
@@ -788,9 +904,26 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                             {product.sku}
                           </td>
                           <td className="px-5 py-4">
+                            {(product.category || product.subCategory) && (
+                              <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                {product.category && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
+                                    {product.category}
+                                  </span>
+                                )}
+                                {product.subCategory && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                    {product.subCategory}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                             <div className="font-semibold text-slate-900">{product.name}</div>
                             {product.description && (
-                              <div className="text-xs text-slate-500 line-clamp-1">{product.description}</div>
+                              <div className="text-xs text-slate-500 mt-0.5 line-clamp-1 flex items-center gap-1.5">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                <span>{product.description}</span>
+                              </div>
                             )}
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap">
@@ -931,10 +1064,47 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                 </div>
               </div>
 
+              {/* Kategori & Sub-Kategori */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Kategori</label>
+                  <input
+                    type="text"
+                    list="edit-category-suggestions"
+                    placeholder="Pilih atau ketik kategori..."
+                    value={editProductForm.category}
+                    onChange={(e) => setEditProductForm({ ...editProductForm, category: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                  <datalist id="edit-category-suggestions">
+                    {categoriesList.map((c) => (
+                      <option key={c.category} value={c.category} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Sub-Kategori</label>
+                  <input
+                    type="text"
+                    list="edit-subcategory-suggestions"
+                    placeholder="Pilih atau ketik sub-kategori..."
+                    value={editProductForm.subCategory}
+                    onChange={(e) => setEditProductForm({ ...editProductForm, subCategory: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                  <datalist id="edit-subcategory-suggestions">
+                    {categoriesList.flatMap((c) => c.subCategories).map((sc, idx) => (
+                      <option key={`${sc}-${idx}`} value={sc} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Deskripsi Singkat</label>
+                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Deskripsi (Warna, Ukuran, Keterangan)</label>
                 <textarea
                   rows="2"
+                  placeholder="Contoh: Warna: Putih | Ukuran: 15"
                   value={editProductForm.description}
                   onChange={(e) => setEditProductForm({ ...editProductForm, description: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
@@ -1142,10 +1312,46 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                 </div>
               </div>
 
+              {/* Kategori & Sub-Kategori */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Kategori</label>
+                  <input
+                    type="text"
+                    list="add-category-suggestions"
+                    placeholder="Pilih atau ketik kategori..."
+                    value={newProduct.category}
+                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                  <datalist id="add-category-suggestions">
+                    {categoriesList.map((c) => (
+                      <option key={c.category} value={c.category} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Sub-Kategori</label>
+                  <input
+                    type="text"
+                    list="add-subcategory-suggestions"
+                    placeholder="Pilih atau ketik sub-kategori..."
+                    value={newProduct.subCategory}
+                    onChange={(e) => setNewProduct({ ...newProduct, subCategory: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                  <datalist id="add-subcategory-suggestions">
+                    {categoriesList.flatMap((c) => c.subCategories).map((sc, idx) => (
+                      <option key={`${sc}-${idx}`} value={sc} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Deskripsi Singkat</label>
+                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Deskripsi (Warna, Ukuran, Keterangan)</label>
                 <textarea
-                  placeholder="Keterangan ukuran, ketebalan mikron, bahan baku, dll."
+                  placeholder="Contoh: Warna: Putih | Ukuran: 15"
                   rows="2"
                   value={newProduct.description}
                   onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}

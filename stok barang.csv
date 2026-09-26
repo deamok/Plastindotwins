@@ -1,0 +1,151 @@
+No.;SKU;Kategori;Sub-Kategori;Nama Barang dengan Ukuran
+1;SKU. 01.01.001;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna putih merk REA ukuran 15
+2;SKU. 01.01.002;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna putih merk REA ukuran 24
+3;SKU. 01.01.003;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna putih merk REA ukuran 28
+4;SKU. 01.01.004;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna putih merek BEO ukuran 15
+5;SKU. 01.01.005;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna putih merek BEO ukuran 21
+6;SKU. 01.01.006;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna putih (ALUS) ukuran 35
+7;SKU. 01.01.007;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna putih (ALUS) ukuran 40
+8;SKU. 01.01.008;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna hitam (JAMUR) ukuran 15
+9;SKU. 01.01.009;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna hitam (JAMUR) ukuran 23
+10;SKU. 01.01.010;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna hitam (JAMUR) ukuran 28
+11;SKU. 01.01.011;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna hitam ukuran 35
+12;SKU. 01.01.012;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna hitam ukuran 40
+13;SKU. 01.01.013;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna hitam ukuran 55
+14;SKU. 01.01.014;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna kuning ukuran 15
+15;SKU. 01.01.015;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna kuning ukuran 24
+16;SKU. 01.01.016;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna kuning ukuran 29
+17;SKU. 01.01.017;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna kuning ukuran 35
+18;SKU. 01.01.018;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna kuning ukuran 40
+19;SKU. 01.01.019;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna kuning ukuran 55
+20;SKU. 01.01.020;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna merah ukuran 15
+21;SKU. 01.01.021;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna merah ukuran 24
+22;SKU. 01.01.022;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna merah ukuran 29
+23;SKU. 01.01.023;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna merah ukuran 35
+24;SKU. 01.01.024;Plastik Kemasan;T-Shirt Bag;Plastik Kresek warna merah ukuran 40
+25;SKU. 01.02.001;Plastik Kemasan;Plastik Shopebag;Plastik shopebag ukuran 15
+26;SKU. 01.02.002;Plastik Kemasan;Plastik Shopebag;Plastik shopebag ukuran 20
+27;SKU. 01.02.003;Plastik Kemasan;Plastik Shopebag;Plastik shopebag ukuran 30
+28;SKU. 01.02.004;Plastik Kemasan;Plastik Shopebag;Plastik jinjing 3jari ukuran 50
+29;SKU. 01.02.005;Plastik Kemasan;Plastik Shopebag;Plastik jinjing 3jari ukuran 60
+30;SKU. 01.03.001;Plastik Kemasan;Plastik Cup (Gelas);Plastik cup merek BADAK ukuran 10
+31;SKU. 01.03.002;Plastik Kemasan;Plastik Cup (Gelas);Plastik cup merek JERAPAH ukuran 10
+32;SKU. 01.03.003;Plastik Kemasan;Plastik Cup (Gelas);Plastik cup merek SMILE ukuran 10
+33;SKU. 01.04.001;Plastik Kemasan;Plastik Sepatu;Plastik sepatu klip ukuran 35
+47;SKU. 01.04.002;Plastik Kemasan;Plastik Sepatu;Plastik klip warna bening polos ukuran 7x10
+48;SKU. 01.04.003;Plastik Kemasan;Plastik Sepatu;Plastik klip warna bening polos ukuran 8,7x13
+49;SKU. 01.04.004;Plastik Kemasan;Plastik Sepatu;Plastik klip warna bening polos ukuran 10x15
+50;SKU. 01.04.005;Plastik Kemasan;Plastik Sepatu;Plastik klip warna biru polos ukuran 7x10
+51;SKU. 01.04.006;Plastik Kemasan;Plastik Sepatu;Plastik klip warna biru polos ukuran 8,7x13
+52;SKU. 01.04.007;Plastik Kemasan;Plastik Sepatu;Plastik klip warna biru polos ukuran 10x15
+34;SKU. 02.01.001;Plastik Penyimpanan;Plastik Sampah ;Plastik sampah warna hitam ukuran 60x100
+35;SKU. 02.01.002;Plastik Penyimpanan;Plastik Sampah ;Plastik sampah warna hitam merek AREMA ukuran 80x100
+36;SKU. 02.01.003;Plastik Penyimpanan;Plastik Sampah ;Plastik sampah warna hitam merek OPTIMA ukuran 80x100
+37;SKU. 02.01.004;Plastik Penyimpanan;Plastik Sampah ;Plastik sampah warna hitam ukuran 90x120
+38;SKU. 02.01.005;Plastik Penyimpanan;Plastik Sampah ;Plastik sampah warna kuning ukuran 60x100
+39;SKU. 02.01.006;Plastik Penyimpanan;Plastik Sampah ;Plastik sampah warna kuning ukuran 80x100
+40;SKU. 02.02.001;Plastik Penyimpanan;Plastik Laundry;Plastik Laundry 5kg ukuran  25x45 
+41;SKU. 02.02.002;Plastik Penyimpanan;Plastik Laundry;Plastik Laundry 8kg ukuran  30x50 
+42;SKU. 02.02.003;Plastik Penyimpanan;Plastik Laundry;Plastik laundry 10kg ukuran  35x50 
+43;SKU. 02.02.004;Plastik Penyimpanan;Plastik Laundry;Plastik Laundry 12kg ukuran  35x60 
+44;SKU. 02.02.005;Plastik Penyimpanan;Plastik Laundry;Plastik laundry 15kg ukuran  40x60 
+45;SKU. 02.02.006;Plastik Penyimpanan;Plastik Laundry;Plastik laundry 20kg ukuran  40x70 
+46;SKU. 02.02.007;Plastik Penyimpanan;Plastik Laundry;Plastik Badcover ukuran  60x100 
+53;SKU. 02.03.001;Plastik Penyimpanan;Plastik Bening;Plastik warna bening merek MANGGA ukuran 15
+54;SKU. 02.03.002;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 6x10
+55;SKU. 02.03.003;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 7x13
+56;SKU. 02.03.004;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 8x16
+57;SKU. 02.03.005;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 9x18
+58;SKU. 02.03.006;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 11x22
+59;SKU. 02.03.007;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 14x27
+60;SKU. 02.03.008;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 20x30
+61;SKU. 02.03.009;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 23x35
+62;SKU. 02.03.010;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 25x45
+63;SKU. 02.03.011;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,3 ukuran 30x50
+64;SKU. 02.03.012;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,8 merek BOROBUDUR ukuran 25
+65;SKU. 02.03.013;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,8 merek BOROBUDUR ukuran 30
+66;SKU. 02.03.014;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 0,8 merek BOROBUDUR ukuran 35
+67;SKU. 02.03.015;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 2IK (PP) ukuran 20x30 (2kg)
+68;SKU. 02.03.016;Plastik Penyimpanan;Plastik Bening;Plastik warna bening 2IK (PP) ukuran 14X27 (1kg)
+69;SKU. 03.01.001;Kebutuhan Medis;Wadah Obat;Pot urine ( Pot salep ) ukuran 5gr
+70;SKU. 03.01.002;Kebutuhan Medis;Wadah Obat;Pot urine ( Pot salep ) ukuran 10gr
+71;SKU. 03.01.003;Kebutuhan Medis;Wadah Obat;Pot urine ( Pot salep ) ukuran 15gr
+72;SKU. 03.01.004;Kebutuhan Medis;Wadah Obat;Pot urine ( Pot salep ) ukuran 20gr
+73;SKU. 03.01.005;Kebutuhan Medis;Wadah Obat;Pot urine ( Pot salep ) ukuran 30gr
+74;SKU. 03.01.006;Kebutuhan Medis;Wadah Obat;Pot urine ( Pot salep ) ukuran 40gr
+75;SKU. 03.01.007;Kebutuhan Medis;Wadah Obat;Pot urine ( Pot salep ) ukuran 50gr
+76;SKU. 03.01.008;Kebutuhan Medis;Wadah Obat;Pot dahak (steril) ukuran 60ml
+77;SKU. 03.01.009;Kebutuhan Medis;Wadah Obat;Kertas perkamen ukuran kecil 
+78;SKU. 03.01.010;Kebutuhan Medis;Wadah Obat;Kertas perkamen ukuran Besar 
+79;SKU. 03.01.011;Kebutuhan Medis;Wadah Obat;Kertas puyer press sablon (600pcs)
+80;SKU. 03.01.012;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 4x6 sablon bening
+81;SKU. 03.01.013;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 5x8 sablon bening
+82;SKU. 03.01.014;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 7x10 sablon bening
+83;SKU. 03.01.015;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 8,7x13 sablon bening
+84;SKU. 03.01.016;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 10x15 sablon bening
+85;SKU. 03.01.017;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 4x6 sablon warna biru
+86;SKU. 03.01.018;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 5x8 sablon warna biru
+87;SKU. 03.01.019;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 7x10 sablon warna biru
+88;SKU. 03.01.020;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 8,7x13 sablon warna biru
+89;SKU. 03.01.021;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 10x15 sablon warna biru
+90;SKU. 03.01.022;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 4x6 sablon warna merah
+91;SKU. 03.01.023;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 5x8 sablon warna merah
+92;SKU. 03.01.024;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 7x10 sablon warna merah
+93;SKU. 03.01.025;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 8,7x13 sablon warna merah
+94;SKU. 03.01.026;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 10x15 sablon warna merah
+95;SKU. 03.01.027;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 7x10 polos warna merah
+96;SKU. 03.01.028;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 8,7x13 polos warna merah
+97;SKU. 03.01.029;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 10x15 polos warna merah
+98;SKU. 03.01.030;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 7x10 polos warna biru
+99;SKU. 03.01.031;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 8,7x13 polos warna biru
+100;SKU. 03.01.032;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek KLIP  ukuran 10x15 polos warna biru
+101;SKU. 03.01.033;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek ZIP IN ukuran 4x6 polos bening
+102;SKU. 03.01.034;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek ZIP IN ukuran 5x8 polos bening
+103;SKU. 03.01.035;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek ZIP IN ukuran 7x10 polos bening
+104;SKU. 03.01.036;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek ZIP IN ukuran 8,7x13 polos bening
+105;SKU. 03.01.037;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek ZIP IN ukuran 10x15 polos bening
+106;SKU. 03.01.038;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek ZIP IN ukuran 11x17 polos bening
+107;SKU. 03.01.039;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek ZIP IN ukuran 11x20 polos bening
+108;SKU. 03.01.040;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek ZIP IN ukuran 16x25 polos bening
+109;SKU. 03.01.041;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 4x6 polos bening
+110;SKU. 03.01.042;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 5x8 polos bening
+111;SKU. 03.01.043;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 6x10 polos bening
+112;SKU. 03.01.044;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 7x10 polos bening
+113;SKU. 03.01.045;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 8,7x13 polos bening
+114;SKU. 03.01.046;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 10x15 polos bening
+115;SKU. 03.01.047;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 11x20 polos bening
+116;SKU. 03.01.048;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 16x25 polos bening
+117;SKU. 03.01.049;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 17x11 polos bening
+118;SKU. 03.01.050;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 20x30 polos bening
+119;SKU. 03.01.051;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 25x35 polos bening
+120;SKU. 03.01.052;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 30x40 polos bening
+121;SKU. 03.01.053;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 4x6 sablon bening
+122;SKU. 03.01.054;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 5x8 sablon bening
+123;SKU. 03.01.055;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 7x10 sablon bening
+124;SKU. 03.01.056;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 8,7x13 sablon bening
+125;SKU. 03.01.057;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 10x15 sablon bening
+126;SKU. 03.01.058;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 4x6 sablon biru
+127;SKU. 03.01.059;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 5x8 sablon biru
+128;SKU. 03.01.060;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 7x10 sablon biru
+129;SKU. 03.01.061;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 8,7x13 sablon biru
+130;SKU. 03.01.062;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 10x15 sablon biru
+131;SKU. 03.01.063;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 4x6 sablon merah
+132;SKU. 03.01.064;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 5x8 sablon merah
+133;SKU. 03.01.065;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 7x10 sablon merah
+134;SKU. 03.01.066;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 8,7x13 sablon merah
+135;SKU. 03.01.067;Kebutuhan Medis;Wadah Obat;Plastik Klip Ziplock merek C-TIK ukuran 10x15 sablon merah
+136;SKU. 03.02.001;Kebutuhan Medis;Alat Kesehatan & Laboratorium;Pipet drop
+137;SKU. 03.02.002;Kebutuhan Medis;Alat Kesehatan & Laboratorium;Sendok Obat
+138;SKU. 03.02.003;Kebutuhan Medis;Alat Kesehatan & Laboratorium;Pipet kaca
+139;SKU. 03.02.004;Kebutuhan Medis;Alat Kesehatan & Laboratorium;HANDSCOON ukuran L 
+140;SKU. 03.02.005;Kebutuhan Medis;Alat Kesehatan & Laboratorium;MEDIFIX ukuran 15x5 M
+141;SKU. 03.02.006;Kebutuhan Medis;Alat Kesehatan & Laboratorium;Transofix (pembolong infus) 
+142;SKU. 03.02.007;Kebutuhan Medis;Alat Kesehatan & Laboratorium;Thermometer digital (sakamed)
+143;SKU. 03.02.008;Kebutuhan Medis;Alat Kesehatan & Laboratorium;Kertas USG Sonny (Original)
+144;SKU. 03.02.009;Kebutuhan Medis;Alat Kesehatan & Laboratorium;Plastik infeksius Logo A warna kuning ukuran 50x75
+145;SKU. 03.01.001;Perlengkapan Penunjang;Kertas Tisu (Tissue);Tissue hand towel see-U warna merah
+146;SKU. 03.01.002;Perlengkapan Penunjang;Kertas Tisu (Tissue);Tissue Facial Refill ukuran 600gr 
+147;SKU. 03.01.003;Perlengkapan Penunjang;Kertas Tisu (Tissue);Tissue 1000ply
+148;SKU. 03.01.004;Perlengkapan Penunjang;Kertas Tisu (Tissue);Tissue 250ply
+149;SKU. 03.01.005;Perlengkapan Penunjang;Perekat (Tape);Solasi Berry ukuran 24mmx72yard 
+150;SKU. 03.01.006;Perlengkapan Penunjang;Perekat (Tape);Solasi Nachi ukuran 24mmx72yard

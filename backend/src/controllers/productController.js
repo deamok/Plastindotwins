@@ -4,7 +4,22 @@ const prisma = new PrismaClient();
 // 1. Ambil Semua Daftar Produk Beserta Stok per Lokasi Gudang
 exports.getAllProducts = async (req, res) => {
   try {
+    const { category, subCategory, search } = req.query;
+    const where = {};
+    if (category && category !== 'ALL') where.category = category;
+    if (subCategory && subCategory !== 'ALL') where.subCategory = subCategory;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { category: { contains: search, mode: 'insensitive' } },
+        { subCategory: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
     const products = await prisma.product.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         stocks: {
@@ -26,12 +41,41 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
+// Ambil Daftar Kategori & Sub-Kategori Unik
+exports.getCategories = async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { category: { not: null } },
+      select: { category: true, subCategory: true },
+      distinct: ['category', 'subCategory']
+    });
+
+    const catMap = {};
+    products.forEach((p) => {
+      if (!p.category) return;
+      if (!catMap[p.category]) catMap[p.category] = new Set();
+      if (p.subCategory) catMap[p.category].add(p.subCategory);
+    });
+
+    const result = Object.keys(catMap).map((cat) => ({
+      category: cat,
+      subCategories: Array.from(catMap[cat])
+    }));
+
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal mengambil data kategori.', error: error.message });
+  }
+};
+
 // 2. Tambah Produk Baru dengan Alokasi Stok Gudang
 exports.createProduct = async (req, res) => {
   try {
     const { 
       sku, 
       name, 
+      category,
+      subCategory,
       description, 
       stock, 
       stockBangetayu, 
@@ -64,6 +108,8 @@ exports.createProduct = async (req, res) => {
         data: {
           sku,
           name,
+          category: category || null,
+          subCategory: subCategory || null,
           description: description || null,
           stock: totalStock,
           minStock: minStock ? parseInt(minStock) : 5,
@@ -225,6 +271,8 @@ exports.updateProduct = async (req, res) => {
     const { 
       sku,
       name, 
+      category,
+      subCategory,
       description, 
       minStock, 
       price, 
@@ -302,6 +350,8 @@ exports.updateProduct = async (req, res) => {
         data: {
           sku: sku || undefined,
           name: name !== undefined ? name : undefined,
+          category: category !== undefined ? (category || null) : undefined,
+          subCategory: subCategory !== undefined ? (subCategory || null) : undefined,
           description: description !== undefined ? description : undefined,
           minStock: minStock !== undefined ? parseInt(minStock) : undefined,
           price: price !== undefined ? price : undefined,

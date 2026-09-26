@@ -3,7 +3,8 @@ const router = express.Router();
 const productController = require('../controllers/productController');
 const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
 
-// Semua user terautentikasi bisa melihat produk
+// Semua user terautentikasi bisa melihat produk & kategori
+router.get('/categories', verifyToken, productController.getCategories);
 router.get('/', verifyToken, productController.getAllProducts);
 
 // Hanya Staff dan Admin yang bisa mengubah/menyesuaikan stok

@@ -34,7 +34,8 @@ export const authService = {
 };
 
 export const productService = {
-  getProducts: () => api.get('/products'),
+  getProducts: (params) => api.get('/products', { params }),
+  getCategories: () => api.get('/products/categories'),
   createProduct: (data) => api.post('/products/create', data),
   updateProduct: (id, data) => api.put(`/products/${id}`, data),
   deleteProduct: (id) => api.delete(`/products/${id}`),
