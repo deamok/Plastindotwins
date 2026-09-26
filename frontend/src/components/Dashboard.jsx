@@ -1137,9 +1137,10 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                       onChange={(e) => setEditProductForm({ ...editProductForm, unit: e.target.value })}
                       className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                     >
-                      <option value="buah">Buah / Pcs</option>
-                      <option value="pak">Pak / Bungkus</option>
-                      <option value="lembar">Lembar</option>
+                      <option value="buah">Buah / Pcs (bh)</option>
+                      <option value="lembar">Lembar (lbr)</option>
+                      <option value="bungkus">Bungkus / Pak (bks)</option>
+                      <option value="pak">Pak</option>
                       <option value="roll">Roll</option>
                     </select>
                   </div>
@@ -1385,9 +1386,10 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                       onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}
                       className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                     >
-                      <option value="buah">Buah / Pcs</option>
-                      <option value="pak">Pak / Bungkus</option>
-                      <option value="lembar">Lembar</option>
+                      <option value="buah">Buah / Pcs (bh)</option>
+                      <option value="lembar">Lembar (lbr)</option>
+                      <option value="bungkus">Bungkus / Pak (bks)</option>
+                      <option value="pak">Pak</option>
                       <option value="roll">Roll</option>
                     </select>
                   </div>

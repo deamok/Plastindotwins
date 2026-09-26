@@ -13,6 +13,7 @@ function extractDetails(rawName) {
   const ukMatch = text.match(/ukuran\s+([0-9a-zA-Z\s.,xX/()\-]+?)(?=\s+(?:sablon|polos|warna|merek|merk)|$)/i);
   if (ukMatch) {
     ukuran = ukMatch[1].trim();
+    ukuran = ukuran.replace(/\s+(?:sablon|polos).*$/i, '').trim();
   }
   if (!ukuran) {
     if (/600gr/i.test(text)) ukuran = '600gr';
@@ -57,37 +58,27 @@ function extractDetails(rawName) {
   };
 }
 
-function determineUnits(cat, subcat, name) {
-  let unit = 'pak';
-  let purchaseUnit = 'kg';
-
-  if (subcat.includes('Tape') || subcat.includes('Perekat')) {
-    unit = 'roll';
-    purchaseUnit = 'dus';
-  } else if (subcat.includes('Tissue') || subcat.includes('Kertas Tisu')) {
-    unit = 'pak';
-    purchaseUnit = 'dus';
-  } else if (subcat.includes('Cup') || subcat.includes('Gelas')) {
-    unit = 'pak';
-    purchaseUnit = 'dus';
-  } else if (subcat.includes('Alat Kesehatan')) {
-    unit = 'buah';
-    purchaseUnit = 'dus';
-  } else if (subcat.includes('Wadah Obat')) {
-    if (/klip|kertas/i.test(name)) {
-      unit = 'pak';
-      purchaseUnit = 'dus';
-    } else {
-      unit = 'buah';
-      purchaseUnit = 'dus';
-    }
+function determinePurchaseUnit(cat, subcat) {
+  if (cat === 'Plastik Kemasan' || cat === 'Plastik Penyimpanan') {
+    return 'kg';
   }
+  return 'dus';
+}
 
-  return { unit, purchaseUnit };
+function mapSatuanToUnit(satuan, cat, subcat) {
+  if (!satuan) return 'buah';
+  const s = satuan.toLowerCase().trim();
+  if (s === 'lbr') return 'lembar';
+  if (s === 'bh') {
+    if (subcat.includes('Tape') || subcat.includes('Perekat')) return 'roll';
+    return 'buah';
+  }
+  if (s === 'bks') return 'bungkus';
+  return s;
 }
 
 async function main() {
-  console.log('--- Memulai Import Master Barang dari CSV ---');
+  console.log('--- Memperbarui Master Barang dari stok barang.csv ---');
   const csvPath = path.join(__dirname, '../../stok barang.csv');
   if (!fs.existsSync(csvPath)) {
     throw new Error(`File CSV tidak ditemukan di: ${csvPath}`);
@@ -97,7 +88,6 @@ async function main() {
   const lines = content.split('\n').filter((l) => l.trim().length > 0).slice(1);
   console.log(`Ditemukan ${lines.length} baris barang dalam CSV.`);
 
-  // Pastikan lokasi gudang tersedia
   const locations = await prisma.location.findMany();
   console.log(`Lokasi gudang terdaftar: ${locations.map((l) => l.name).join(', ')}`);
 
@@ -106,12 +96,13 @@ async function main() {
 
   for (let i = 0; i < lines.length; i++) {
     const row = lines[i];
-    const parts = row.split(';').map((s) => (s ? s.trim() : ''));
+    const parts = row.split(';').map((s) => (s ? s.replace(/\r/g, '').trim() : ''));
     const no = parseInt(parts[0]);
     let sku = parts[1];
     const cat = parts[2];
     const subcat = parts[3];
     const rawName = parts[4];
+    const rawSatuan = parts[5];
 
     if (!sku || !rawName) continue;
 
@@ -119,7 +110,6 @@ async function main() {
     // yang tercatat sebagai 03.01.xxx agar sesuai hierarki kategori 04
     if (cat === 'Perlengkapan Penunjang') {
       if (subcat.includes('Tissue')) {
-        // No 145 -> 04.01.001, No 146 -> 04.01.002, dst
         const seq = String(no - 144).padStart(3, '0');
         sku = `SKU. 04.01.${seq}`;
       } else if (subcat.includes('Tape') || subcat.includes('Perekat')) {
@@ -129,7 +119,8 @@ async function main() {
     }
 
     const { rawName: cleanName, description } = extractDetails(rawName);
-    const { unit, purchaseUnit } = determineUnits(cat, subcat, cleanName);
+    const unit = mapSatuanToUnit(rawSatuan, cat, subcat);
+    const purchaseUnit = determinePurchaseUnit(cat, subcat);
 
     // Cari apakah produk sudah ada dengan SKU ini
     const existing = await prisma.product.findUnique({
@@ -145,7 +136,9 @@ async function main() {
           name: cleanName,
           category: cat,
           subCategory: subcat,
-          description: description || existing.description
+          description: description,
+          unit,
+          purchaseUnit
         }
       });
       updatedCount++;
@@ -188,42 +181,16 @@ async function main() {
     }
   }
 
-  // Update kategori untuk 6 produk sampel lama jika belum memiliki kategori
-  await prisma.product.updateMany({
-    where: { sku: 'PLS-003', category: null },
-    data: { category: 'Plastik Kemasan', subCategory: 'Wadah Botol' }
-  });
-  await prisma.product.updateMany({
-    where: { sku: 'PLS-002', category: null },
-    data: { category: 'Plastik Penyimpanan', subCategory: 'Jerigen' }
-  });
-  await prisma.product.updateMany({
-    where: { sku: 'PLS-KRESEK-HD', category: null },
-    data: { category: 'Plastik Kemasan', subCategory: 'T-Shirt Bag' }
-  });
-  await prisma.product.updateMany({
-    where: { sku: 'PLS-001', category: null },
-    data: { category: 'Plastik Kemasan', subCategory: 'Wadah Botol' }
-  });
-  await prisma.product.updateMany({
-    where: { sku: 'PLS-004', category: null },
-    data: { category: 'Plastik Penyimpanan', subCategory: 'Plastik Bening' }
-  });
-  await prisma.product.updateMany({
-    where: { sku: 'PLS-006', category: null },
-    data: { category: 'Plastik Kemasan', subCategory: 'Plastik Sepatu' }
-  });
-
   const total = await prisma.product.count();
-  console.log(`\n=== IMPORT SELESAI ===`);
-  console.log(`Baru diimpor: ${importedCount}`);
-  console.log(`Diperbarui: ${updatedCount}`);
-  console.log(`Total produk di database sekarang: ${total}`);
+  console.log(`\n=== UPDATE SELESAI ===`);
+  console.log(`Barang Diperbarui (Updated): ${updatedCount}`);
+  console.log(`Barang Baru Diimpor: ${importedCount}`);
+  console.log(`Total produk aktif di database: ${total}`);
 }
 
 main()
   .catch((e) => {
-    console.error('Error saat import:', e);
+    console.error('Error saat update produk:', e);
     process.exit(1);
   })
   .finally(async () => {
