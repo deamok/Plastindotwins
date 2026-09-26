@@ -17,6 +17,12 @@ enum TransactionType {
   STOCK_OUT
 }
 
+enum ContactType {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+}
+
 model User {
   id        String     @id @default(uuid())
   email     String     @unique
@@ -27,6 +33,23 @@ model User {
   updatedAt DateTime   @updatedAt
   sales     Sale[]
   purchases Purchase[]
+}
+
+model Contact {
+  id                String       @id @default(uuid())
+  name              String
+  type              ContactType  @default(CUSTOMER) // CUSTOMER, SUPPLIER, BOTH
+  phone             String?
+  email             String?
+  address           String?
+  bankName          String?      // Nama Bank (misal: BCA, Mandiri, BRI, BNI)
+  bankAccountNo     String?      // Nomor Rekening
+  bankAccountHolder String?      // Nama Pemilik Rekening / Atas Nama
+  notes             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  sales             Sale[]
+  purchases         Purchase[]
 }
 
 model Product {
@@ -62,6 +85,8 @@ model Sale {
   id            String     @id @default(uuid())
   invoiceNo     String     @unique
   customerName  String
+  contactId     String?
+  contact       Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
   totalAmount   Decimal    @db.Decimal(12, 2)
   paymentMethod String     @default("CASH") // CASH, TRANSFER, TEMPO
   notes         String?
@@ -91,6 +116,8 @@ model Purchase {
   id            String         @id @default(uuid())
   purchaseNo    String         @unique
   supplierName  String
+  contactId     String?
+  contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
   totalAmount   Decimal        @db.Decimal(12, 2)
   paymentStatus String         @default("PAID") // PAID, PENDING
   notes         String?

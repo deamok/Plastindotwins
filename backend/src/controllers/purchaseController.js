@@ -16,6 +16,9 @@ exports.getAllPurchases = async (req, res) => {
         },
         user: {
           select: { id: true, name: true, email: true }
+        },
+        contact: {
+          select: { id: true, name: true, phone: true, email: true, address: true, bankName: true, bankAccountNo: true, bankAccountHolder: true }
         }
       }
     });
@@ -29,10 +32,18 @@ exports.getAllPurchases = async (req, res) => {
 // 2. Buat Transaksi Pembelian Baru dari Supplier (ACID Transaction dengan Konversi Satuan)
 exports.createPurchase = async (req, res) => {
   try {
-    const { supplierName, paymentStatus = 'PAID', notes, items } = req.body;
+    const { supplierName, contactId, paymentStatus = 'PAID', notes, items } = req.body;
     const userId = req.user?.id || null;
 
-    if (!supplierName || !items || !Array.isArray(items) || items.length === 0) {
+    let finalSupplierName = supplierName;
+    if (contactId) {
+      const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+      if (contact) {
+        finalSupplierName = contact.name;
+      }
+    }
+
+    if (!finalSupplierName || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Nama supplier dan minimal 1 item pembelian wajib diisi.' });
     }
 
@@ -102,7 +113,8 @@ exports.createPurchase = async (req, res) => {
       const purchase = await tx.purchase.create({
         data: {
           purchaseNo,
-          supplierName,
+          supplierName: finalSupplierName,
+          contactId: contactId || null,
           totalAmount,
           paymentStatus,
           notes: notes || null,
@@ -114,7 +126,8 @@ exports.createPurchase = async (req, res) => {
         include: {
           items: {
             include: { product: true }
-          }
+          },
+          contact: true
         }
       });
 

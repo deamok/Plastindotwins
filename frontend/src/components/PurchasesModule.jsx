@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { purchaseService, productService } from '../services/api';
+import { purchaseService, productService, contactService } from '../services/api';
 import { 
   Truck, 
   PlusCircle, 
@@ -12,16 +12,24 @@ import {
   TrendingDown,
   Layers,
   Scale,
-  ArrowRight
+  ArrowRight,
+  Users,
+  CreditCard,
+  Copy,
+  Check,
+  Phone,
+  MapPin
 } from 'lucide-react';
 
 export default function PurchasesModule({ user, onOpenAuth }) {
   const [purchases, setPurchases] = useState([]);
   const [products, setProducts] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [search, setSearch] = useState('');
+  const [copiedRekening, setCopiedRekening] = useState(false);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,6 +37,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
 
   // Form State
   const [supplierName, setSupplierName] = useState('');
+  const [contactId, setContactId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('PAID');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([
@@ -43,12 +52,14 @@ export default function PurchasesModule({ user, onOpenAuth }) {
     try {
       setLoading(true);
       setError('');
-      const [purchasesRes, prodRes] = await Promise.all([
+      const [purchasesRes, prodRes, contactsRes] = await Promise.all([
         purchaseService.getPurchases(),
-        productService.getProducts()
+        productService.getProducts(),
+        contactService.getContacts({ type: 'SUPPLIER' }).catch(() => ({ data: { data: [] } }))
       ]);
       setPurchases(purchasesRes.data.data || []);
       setProducts(prodRes.data.data || []);
+      setContacts(contactsRes.data.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal memuat data pembelian.');
     } finally {
@@ -63,6 +74,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
     }
     const defaultProd = products[0];
     setSupplierName('');
+    setContactId('');
     setPaymentStatus('PAID');
     setNotes('');
     setItems([
@@ -138,6 +150,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
       setError('');
       const res = await purchaseService.createPurchase({
         supplierName,
+        contactId: contactId || null,
         paymentStatus,
         notes,
         items
@@ -156,6 +169,8 @@ export default function PurchasesModule({ user, onOpenAuth }) {
     return (
       p.purchaseNo.toLowerCase().includes(search.toLowerCase()) ||
       p.supplierName.toLowerCase().includes(search.toLowerCase()) ||
+      (p.contact?.name && p.contact.name.toLowerCase().includes(search.toLowerCase())) ||
+      (p.contact?.bankAccountNo && p.contact.bankAccountNo.toLowerCase().includes(search.toLowerCase())) ||
       (p.notes && p.notes.toLowerCase().includes(search.toLowerCase()))
     );
   });
@@ -285,10 +300,23 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                       timeStyle: 'short'
                     })}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {purchase.supplierName}
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-slate-900 flex items-center gap-1.5">
+                      {purchase.contact && (
+                        <span className="p-1 bg-blue-50 text-blue-700 rounded-md shrink-0" title="Supplier Terdaftar di Kontak">
+                          <Users className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                      <span>{purchase.supplierName}</span>
+                    </div>
+                    {purchase.contact?.bankAccountNo && (
+                      <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                        <CreditCard className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>{purchase.contact.bankName}: {purchase.contact.bankAccountNo}</span>
+                      </div>
+                    )}
                     {purchase.notes && (
-                      <span className="block text-xs text-slate-400">{purchase.notes}</span>
+                      <span className="block text-xs text-slate-400 mt-0.5">{purchase.notes}</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
@@ -374,15 +402,86 @@ export default function PurchasesModule({ user, onOpenAuth }) {
             <form onSubmit={handleSubmitPurchase} className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Supplier / Pabrik</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-600 uppercase">
+                      Pemasok / Supplier <span className="text-red-500">*</span>
+                    </label>
+                    {contactId && (
+                      <button
+                        type="button"
+                        onClick={() => { setContactId(''); setSupplierName(''); }}
+                        className="text-[10px] text-blue-600 hover:underline font-semibold"
+                      >
+                        Ketik Manual
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={contactId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setContactId(val);
+                      const c = contacts.find((item) => item.id === val);
+                      if (c) setSupplierName(c.name);
+                    }}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden mb-1.5"
+                  >
+                    <option value="">-- Pilih dari Kontak Supplier (atau ketik manual) --</option>
+                    {contacts.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.bankName ? `[${c.bankName} ${c.bankAccountNo || ''}]` : ''} {c.phone ? `(${c.phone})` : ''}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     type="text"
                     required
                     placeholder="Contoh: PT Sumber Plastik Abadi"
                     value={supplierName}
                     onChange={(e) => setSupplierName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                   />
+                  {contactId && (() => {
+                    const c = contacts.find((item) => item.id === contactId);
+                    if (!c) return null;
+                    return (
+                      <div className="mt-2 p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-slate-800 space-y-1">
+                        <div className="flex items-center justify-between font-semibold text-blue-900">
+                          <div className="flex items-center gap-1.5">
+                            <CreditCard className="w-3.5 h-3.5 text-blue-700" />
+                            <span>Rekening Pembayaran Supplier:</span>
+                          </div>
+                          {c.bankAccountNo && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(c.bankAccountNo);
+                                setCopiedRekening(true);
+                                setTimeout(() => setCopiedRekening(false), 2000);
+                              }}
+                              className="px-2 py-0.5 bg-white hover:bg-blue-100 border border-blue-300 rounded text-[11px] font-semibold text-blue-800 flex items-center gap-1 transition-colors"
+                            >
+                              {copiedRekening ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedRekening ? 'Tersalin!' : 'Salin Rekening'}</span>
+                            </button>
+                          )}
+                        </div>
+                        {c.bankAccountNo ? (
+                          <div className="font-mono text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <span className="bg-blue-100 px-1.5 py-0.5 rounded text-blue-900 text-xs font-semibold">{c.bankName}</span>
+                            <span>{c.bankAccountNo}</span>
+                            {c.bankAccountHolder && <span className="font-sans font-normal text-xs text-slate-600">a.n. {c.bankAccountHolder}</span>}
+                          </div>
+                        ) : (
+                          <div className="text-slate-500 italic text-[11px]">Belum ada data rekening bank untuk kontak ini.</div>
+                        )}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600 pt-1 border-t border-blue-100">
+                          {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-slate-400" /> {c.phone}</span>}
+                          {c.address && <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" /> {c.address}</span>}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Status Pembayaran</label>
@@ -593,10 +692,55 @@ export default function PurchasesModule({ user, onOpenAuth }) {
               </button>
             </div>
 
-            <div className="text-xs space-y-1 mb-4 text-slate-600 bg-slate-50 p-3 rounded-xl">
-              <div>Supplier: <strong className="text-slate-900">{selectedPurchaseDetail.supplierName}</strong></div>
-              <div>Status: <strong className="text-slate-900">{selectedPurchaseDetail.paymentStatus === 'PAID' ? 'LUNAS' : 'TEMPO / PENDING'}</strong></div>
-              <div>Tanggal: {new Date(selectedPurchaseDetail.createdAt).toLocaleString('id-ID')}</div>
+            <div className="text-xs space-y-2 mb-4 text-slate-600 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>Supplier: <strong className="text-slate-900">{selectedPurchaseDetail.supplierName}</strong></div>
+                {selectedPurchaseDetail.contact && (
+                  <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[11px] font-medium flex items-center gap-1">
+                    <Users className="w-3 h-3" /> Mitra Kontak
+                  </span>
+                )}
+              </div>
+              {selectedPurchaseDetail.contact?.bankAccountNo && (
+                <div className="p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg text-slate-800 space-y-1">
+                  <div className="text-[11px] font-semibold text-blue-900 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <CreditCard className="w-3.5 h-3.5 text-blue-700" /> Rekening Pembayaran Supplier:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedPurchaseDetail.contact.bankAccountNo);
+                        setCopiedRekening(true);
+                        setTimeout(() => setCopiedRekening(false), 2000);
+                      }}
+                      className="text-[10px] bg-white border border-blue-300 px-2 py-0.5 rounded font-sans text-blue-800 hover:bg-blue-100 flex items-center gap-1"
+                    >
+                      {copiedRekening ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedRekening ? 'Tersalin!' : 'Salin Rekening'}</span>
+                    </button>
+                  </div>
+                  <div className="font-mono font-bold text-slate-900 flex items-center gap-2">
+                    <span className="bg-blue-100 text-blue-800 text-[11px] px-1.5 py-0.5 rounded">{selectedPurchaseDetail.contact.bankName}</span>
+                    <span>{selectedPurchaseDetail.contact.bankAccountNo}</span>
+                    {selectedPurchaseDetail.contact.bankAccountHolder && (
+                      <span className="font-sans font-normal text-xs text-slate-600">a.n. {selectedPurchaseDetail.contact.bankAccountHolder}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600 pt-1 border-t border-blue-100/60">
+                    {selectedPurchaseDetail.contact.phone && (
+                      <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-slate-400" /> {selectedPurchaseDetail.contact.phone}</span>
+                    )}
+                    {selectedPurchaseDetail.contact.address && (
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" /> {selectedPurchaseDetail.contact.address}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center justify-between pt-1">
+                <div>Status: <strong className="text-slate-900">{selectedPurchaseDetail.paymentStatus === 'PAID' ? 'LUNAS' : 'TEMPO / PENDING'}</strong></div>
+                <div>Tanggal: {new Date(selectedPurchaseDetail.createdAt).toLocaleString('id-ID')}</div>
+              </div>
               {selectedPurchaseDetail.notes && <div>Catatan: {selectedPurchaseDetail.notes}</div>}
             </div>
 

@@ -51,4 +51,12 @@ export const purchaseService = {
   createPurchase: (data) => api.post('/purchases', data),
 };
 
+export const contactService = {
+  getContacts: (params) => api.get('/contacts', { params }),
+  getContactById: (id) => api.get(`/contacts/${id}`),
+  createContact: (data) => api.post('/contacts', data),
+  updateContact: (id, data) => api.put(`/contacts/${id}`, data),
+  deleteContact: (id) => api.delete(`/contacts/${id}`),
+};
+
 export default api;

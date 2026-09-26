@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { saleService, productService } from '../services/api';
+import { saleService, productService, contactService } from '../services/api';
 import { 
   ShoppingCart, 
   PlusCircle, 
@@ -14,12 +14,17 @@ import {
   Package,
   Layers,
   ArrowRight,
-  Boxes
+  Boxes,
+  Users,
+  CreditCard,
+  Phone,
+  MapPin
 } from 'lucide-react';
 
 export default function SalesModule({ user, onOpenAuth }) {
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -31,6 +36,7 @@ export default function SalesModule({ user, onOpenAuth }) {
 
   // Form State
   const [customerName, setCustomerName] = useState('');
+  const [contactId, setContactId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([
@@ -53,12 +59,14 @@ export default function SalesModule({ user, onOpenAuth }) {
     try {
       setLoading(true);
       setError('');
-      const [salesRes, prodRes] = await Promise.all([
+      const [salesRes, prodRes, contactsRes] = await Promise.all([
         saleService.getSales(),
-        productService.getProducts()
+        productService.getProducts(),
+        contactService.getContacts({ type: 'CUSTOMER' }).catch(() => ({ data: { data: [] } }))
       ]);
       setSales(salesRes.data.data || []);
       setProducts(prodRes.data.data || []);
+      setContacts(contactsRes.data.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal memuat data penjualan.');
     } finally {
@@ -76,6 +84,7 @@ export default function SalesModule({ user, onOpenAuth }) {
     const defaultPrice = defaultProd ? parseFloat(defaultProd.price || 0) : 0;
 
     setCustomerName('');
+    setContactId('');
     setPaymentMethod('CASH');
     setNotes('');
     setItems([
@@ -254,6 +263,7 @@ export default function SalesModule({ user, onOpenAuth }) {
 
       const res = await saleService.createSale({
         customerName,
+        contactId: contactId || null,
         paymentMethod,
         notes,
         items: payloadItems
@@ -404,7 +414,24 @@ export default function SalesModule({ user, onOpenAuth }) {
                     })}
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-900">
-                    {sale.customerName}
+                    <div className="flex items-center gap-1.5">
+                      <span>{sale.customerName}</span>
+                      {sale.contact && (
+                        <span className="px-1.5 py-0.5 text-[10px] bg-indigo-50 text-indigo-700 rounded border border-indigo-200 font-semibold">
+                          Mitra
+                        </span>
+                      )}
+                    </div>
+                    {sale.contact?.phone && (
+                      <a
+                        href={`https://wa.me/${sale.contact.phone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block text-[11px] text-emerald-600 hover:underline font-mono"
+                      >
+                        WA: {sale.contact.phone}
+                      </a>
+                    )}
                     {sale.notes && (
                       <span className="block text-xs text-slate-400">{sale.notes}</span>
                     )}
@@ -498,15 +525,56 @@ export default function SalesModule({ user, onOpenAuth }) {
             <form onSubmit={handleSubmitSale} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Pelanggan</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-600 uppercase">
+                      Nama Pelanggan <span className="text-red-500">*</span>
+                    </label>
+                    {contactId && (
+                      <button
+                        type="button"
+                        onClick={() => { setContactId(''); setCustomerName(''); }}
+                        className="text-[10px] text-indigo-600 hover:underline font-semibold"
+                      >
+                        Ketik Manual
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={contactId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setContactId(val);
+                      const c = contacts.find((item) => item.id === val);
+                      if (c) setCustomerName(c.name);
+                    }}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden mb-1.5"
+                  >
+                    <option value="">-- Pilih dari Kontak Terdaftar (atau ketik manual) --</option>
+                    {contacts.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.phone ? `(${c.phone})` : ''} {c.bankName ? `[${c.bankName}]` : ''}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     type="text"
                     required
                     placeholder="Contoh: Toko Maju Plastik / Bpk. Rudi"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                   />
+                  {contactId && (() => {
+                    const c = contacts.find((item) => item.id === contactId);
+                    if (!c) return null;
+                    return (
+                      <div className="mt-1.5 p-2 bg-indigo-50/70 border border-indigo-100 rounded-lg text-[11px] text-indigo-900 space-y-0.5">
+                        {c.phone && <div className="font-medium">📞 Telp/WA: {c.phone}</div>}
+                        {c.bankAccountNo && <div>💳 Rekening: <strong>{c.bankName} {c.bankAccountNo}</strong> {c.bankAccountHolder && `(a.n. ${c.bankAccountHolder})`}</div>}
+                        {c.address && <div className="text-slate-500 line-clamp-1">📍 {c.address}</div>}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Metode Pembayaran</label>
@@ -778,9 +846,27 @@ export default function SalesModule({ user, onOpenAuth }) {
               </button>
             </div>
 
-            <div className="text-xs space-y-1 mb-4 text-slate-600 bg-slate-50 p-3 rounded-xl">
-              <div>Pelanggan: <strong className="text-slate-900">{selectedSaleDetail.customerName}</strong></div>
-              <div>Metode: <strong className="text-slate-900">{selectedSaleDetail.paymentMethod}</strong></div>
+            <div className="text-xs space-y-1.5 mb-4 text-slate-600 bg-slate-50 p-3 rounded-xl">
+              <div>
+                Pelanggan: <strong className="text-slate-900">{selectedSaleDetail.customerName}</strong>
+                {selectedSaleDetail.contact && (
+                  <span className="ml-1.5 px-1.5 py-0.5 text-[10px] bg-indigo-50 text-indigo-700 rounded border border-indigo-200 font-semibold">
+                    Mitra Terdaftar
+                  </span>
+                )}
+              </div>
+              {selectedSaleDetail.contact?.phone && (
+                <div>No. HP / WA: <strong className="text-emerald-700">{selectedSaleDetail.contact.phone}</strong></div>
+              )}
+              {selectedSaleDetail.contact?.bankAccountNo && (
+                <div>
+                  Rekening: <strong>{selectedSaleDetail.contact.bankName} {selectedSaleDetail.contact.bankAccountNo}</strong> {selectedSaleDetail.contact.bankAccountHolder && `(a.n. ${selectedSaleDetail.contact.bankAccountHolder})`}
+                </div>
+              )}
+              {selectedSaleDetail.contact?.address && (
+                <div>Alamat: {selectedSaleDetail.contact.address}</div>
+              )}
+              <div>Metode Bayar: <strong className="text-slate-900">{selectedSaleDetail.paymentMethod}</strong></div>
               <div>Tanggal: {new Date(selectedSaleDetail.createdAt).toLocaleString('id-ID')}</div>
               {selectedSaleDetail.notes && <div>Catatan: {selectedSaleDetail.notes}</div>}
             </div>

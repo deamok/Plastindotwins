@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { productService } from '../services/api';
 import SalesModule from './SalesModule';
 import PurchasesModule from './PurchasesModule';
+import ContactsModule from './ContactsModule';
 import { 
   Package, 
   AlertTriangle, 
@@ -18,7 +19,8 @@ import {
   ShieldAlert,
   LogIn,
   ShoppingCart,
-  Truck
+  Truck,
+  Users
 } from 'lucide-react';
 
 export default function Dashboard({ user, onLogout, onOpenAuth }) {
@@ -258,6 +260,17 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
               <Truck className="w-4 h-4" />
               <span>Pembelian (Purchasing)</span>
             </button>
+            <button
+              onClick={() => setActiveTab('contacts')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                activeTab === 'contacts'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Kontak (Mitra)</span>
+            </button>
           </nav>
 
           <div className="flex items-center gap-4">
@@ -316,6 +329,14 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
           >
             <Truck className="w-3.5 h-3.5" /> Pembelian
           </button>
+          <button
+            onClick={() => setActiveTab('contacts')}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 ${
+              activeTab === 'contacts' ? 'bg-white text-indigo-600 shadow-xs border border-slate-200' : 'text-slate-600'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" /> Kontak
+          </button>
         </div>
       </header>
 
@@ -349,6 +370,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
           <SalesModule user={user} onOpenAuth={onOpenAuth} />
         ) : activeTab === 'purchases' ? (
           <PurchasesModule user={user} onOpenAuth={onOpenAuth} />
+        ) : activeTab === 'contacts' ? (
+          <ContactsModule user={user} onOpenAuth={onOpenAuth} />
         ) : (
           <div>
             {/* Alerts */}

@@ -16,6 +16,9 @@ exports.getAllSales = async (req, res) => {
         },
         user: {
           select: { id: true, name: true, email: true }
+        },
+        contact: {
+          select: { id: true, name: true, phone: true, email: true, address: true, bankName: true, bankAccountNo: true, bankAccountHolder: true }
         }
       }
     });
@@ -29,10 +32,18 @@ exports.getAllSales = async (req, res) => {
 // 2. Buat Transaksi Penjualan Baru (ACID Transaction)
 exports.createSale = async (req, res) => {
   try {
-    const { customerName, paymentMethod = 'CASH', notes, items } = req.body;
+    const { customerName, contactId, paymentMethod = 'CASH', notes, items } = req.body;
     const userId = req.user?.id || null;
 
-    if (!customerName || !items || !Array.isArray(items) || items.length === 0) {
+    let finalCustomerName = customerName;
+    if (contactId) {
+      const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+      if (contact) {
+        finalCustomerName = contact.name;
+      }
+    }
+
+    if (!finalCustomerName || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Nama pelanggan dan minimal 1 item penjualan wajib diisi.' });
     }
 
@@ -106,7 +117,8 @@ exports.createSale = async (req, res) => {
       const sale = await tx.sale.create({
         data: {
           invoiceNo,
-          customerName,
+          customerName: finalCustomerName,
+          contactId: contactId || null,
           totalAmount,
           paymentMethod,
           notes: notes || null,
@@ -118,7 +130,8 @@ exports.createSale = async (req, res) => {
         include: {
           items: {
             include: { product: true }
-          }
+          },
+          contact: true
         }
       });
 
