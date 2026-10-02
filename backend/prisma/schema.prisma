@@ -50,6 +50,7 @@ model Contact {
   phone             String?
   email             String?
   address           String?
+  province          String?      // Propinsi / Provinsi
   bankName          String?      // Nama Bank (misal: BCA, Mandiri, BRI, BNI)
   bankAccountNo     String?      // Nomor Rekening
   bankAccountHolder String?      // Nama Pemilik Rekening / Atas Nama
@@ -180,6 +181,8 @@ model SaleItem {
 model Purchase {
   id            String         @id @default(uuid())
   purchaseNo    String         @unique
+  invoiceNo     String?        // No. Faktur / Invoice dari Supplier
+  purchaseDate  DateTime       @default(now()) // Tanggal Faktur / Pembelian
   supplierName  String
   contactId     String?
   contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)

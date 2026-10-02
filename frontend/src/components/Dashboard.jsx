@@ -28,6 +28,8 @@ import {
   Trash2,
   History,
   ArrowRight,
+  Loader2,
+  Sparkles,
   X
 } from 'lucide-react';
 
@@ -72,6 +74,11 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
     price: '',
     costPrice: ''
   });
+
+  const [skuLoading, setSkuLoading] = useState(false);
+  const [skuInfo, setSkuInfo] = useState(null);
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [isCustomSubCategory, setIsCustomSubCategory] = useState(false);
 
   // Form states - Edit Product
   const [editProductForm, setEditProductForm] = useState({
@@ -171,6 +178,80 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
   };
 
   // --- Handlers: Tambah Produk ---
+  const fetchAutoSku = async (cat, subCat) => {
+    if (!cat || !subCat) {
+      setNewProduct((prev) => ({ ...prev, sku: '' }));
+      setSkuInfo(null);
+      return;
+    }
+    try {
+      setSkuLoading(true);
+      const res = await productService.getNextSku({ category: cat, subCategory: subCat });
+      if (res.data?.success && res.data.data?.sku) {
+        setNewProduct((prev) => ({ ...prev, sku: res.data.data.sku }));
+        setSkuInfo(res.data.data);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil SKU otomatis:', err);
+    } finally {
+      setSkuLoading(false);
+    }
+  };
+
+  const handleCategoryChange = (val) => {
+    if (val === '__CUSTOM__') {
+      setIsCustomCategory(true);
+      setNewProduct((prev) => ({ ...prev, category: '', subCategory: '', sku: '' }));
+      setSkuInfo(null);
+      return;
+    }
+    setIsCustomCategory(false);
+    setIsCustomSubCategory(false);
+
+    let defaultUnit = newProduct.unit;
+    let defaultPurchaseUnit = newProduct.purchaseUnit;
+    if (val === 'Plastik Kemasan' || val === 'Plastik Penyimpanan') {
+      defaultPurchaseUnit = 'kg';
+      defaultUnit = 'lembar';
+    } else if (val === 'Perlengkapan Penunjang') {
+      defaultPurchaseUnit = 'dus';
+      defaultUnit = 'bungkus';
+    } else if (val === 'Kebutuhan Medis') {
+      defaultPurchaseUnit = 'dus';
+      defaultUnit = 'buah';
+    }
+
+    setNewProduct((prev) => ({
+      ...prev,
+      category: val,
+      subCategory: '',
+      sku: '',
+      unit: defaultUnit,
+      purchaseUnit: defaultPurchaseUnit
+    }));
+    setSkuInfo(null);
+  };
+
+  const handleSubCategoryChange = (val) => {
+    if (val === '__CUSTOM__') {
+      setIsCustomSubCategory(true);
+      setNewProduct((prev) => ({ ...prev, subCategory: '', sku: '' }));
+      setSkuInfo(null);
+      return;
+    }
+    setIsCustomSubCategory(false);
+    setNewProduct((prev) => ({ ...prev, subCategory: val }));
+    if (newProduct.category && val) {
+      fetchAutoSku(newProduct.category, val);
+    } else {
+      setNewProduct((prev) => ({ ...prev, sku: '' }));
+      setSkuInfo(null);
+    }
+  };
+
+  const currentCatObj = categoriesList.find((c) => c.category === newProduct.category);
+  const availableSubCategories = currentCatObj ? currentCatObj.subCategories : [];
+
   const handleOpenAddModal = () => {
     if (!user) {
       onOpenAuth();
@@ -180,6 +261,24 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       setError(`Gagal otorisasi: Akun Anda adalah "${user.role}". Hanya peran ADMIN yang dapat menambah produk baru.`);
       return;
     }
+    setNewProduct({
+      sku: '',
+      name: '',
+      category: '',
+      subCategory: '',
+      description: '',
+      stockBangetayu: 0,
+      stockJomblang: 0,
+      minStock: 5,
+      unit: 'lembar',
+      purchaseUnit: 'kg',
+      itemsPerPurchaseUnit: 120,
+      price: '',
+      costPrice: ''
+    });
+    setSkuInfo(null);
+    setIsCustomCategory(false);
+    setIsCustomSubCategory(false);
     setIsAddModalOpen(true);
   };
 
@@ -225,6 +324,9 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
         price: '',
         costPrice: ''
       });
+      setSkuInfo(null);
+      setIsCustomCategory(false);
+      setIsCustomSubCategory(false);
       fetchInventory();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
@@ -1282,70 +1384,204 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-slate-100 max-h-[92vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Tambah Master Produk Baru</h3>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-bold text-slate-900">Tambah Master Produk Baru</h3>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <p className="text-xs text-slate-500 mb-4">
-              Konfigurasi satuan beli (Kg), satuan jual (Pak/Buah), serta alokasi stok awal per gudang.
+              Pilih Kategori & Sub-Kategori untuk membuat nomor SKU otomatis dengan format <span className="font-mono text-blue-600">SKU. kodeKat.kodeSub.noUrut</span>.
             </p>
 
             <form onSubmit={handleCreateProduct} className="space-y-4">
+              {/* Kategori & Sub-Kategori (Pilihan sub-kategori mengikuti kategori) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-blue-50/50 border border-blue-100 rounded-xl">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                    Kategori <span className="text-red-500">*</span>
+                  </label>
+                  {!isCustomCategory ? (
+                    <select
+                      required
+                      value={newProduct.category}
+                      onChange={(e) => handleCategoryChange(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    >
+                      <option value="">-- Pilih Kategori --</option>
+                      {categoriesList.map((c) => (
+                        <option key={c.category} value={c.category}>
+                          {c.code ? `[${c.code}] ` : ''}{c.category}
+                        </option>
+                      ))}
+                      <option value="__CUSTOM__">+ Kategori Baru (Ketik Manual)...</option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        required
+                        autoFocus
+                        placeholder="Ketik kategori baru..."
+                        value={newProduct.category}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewProduct((prev) => ({ ...prev, category: val, sku: '' }));
+                          setSkuInfo(null);
+                        }}
+                        onBlur={() => {
+                          if (newProduct.category && newProduct.subCategory) {
+                            fetchAutoSku(newProduct.category, newProduct.subCategory);
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomCategory(false);
+                          handleCategoryChange('');
+                        }}
+                        className="px-2.5 py-1.5 text-xs text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-xl transition-colors"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 uppercase">
+                      Sub-Kategori <span className="text-red-500">*</span>
+                    </label>
+                    {newProduct.category && (
+                      <span className="text-[10px] text-blue-600 font-medium">
+                        Filter: {newProduct.category}
+                      </span>
+                    )}
+                  </div>
+                  {!isCustomSubCategory ? (
+                    <select
+                      required
+                      disabled={!newProduct.category}
+                      value={newProduct.subCategory}
+                      onChange={(e) => handleSubCategoryChange(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl text-sm font-medium border focus:ring-2 focus:ring-blue-500 focus:outline-hidden ${
+                        !newProduct.category 
+                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' 
+                          : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                    >
+                      <option value="">
+                        {!newProduct.category ? '-- Pilih Kategori Dulu --' : '-- Pilih Sub-Kategori --'}
+                      </option>
+                      {availableSubCategories.map((sc) => (
+                        <option key={sc} value={sc}>
+                          {sc}
+                        </option>
+                      ))}
+                      {newProduct.category && (
+                        <option value="__CUSTOM__">+ Sub-Kategori Baru (Ketik Manual)...</option>
+                      )}
+                    </select>
+                  ) : (
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        required
+                        autoFocus
+                        placeholder="Ketik sub-kategori baru..."
+                        value={newProduct.subCategory}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewProduct((prev) => ({ ...prev, subCategory: val, sku: '' }));
+                          setSkuInfo(null);
+                        }}
+                        onBlur={() => {
+                          if (newProduct.category && newProduct.subCategory) {
+                            fetchAutoSku(newProduct.category, newProduct.subCategory);
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomSubCategory(false);
+                          handleSubCategoryChange('');
+                        }}
+                        className="px-2.5 py-1.5 text-xs text-slate-600 bg-slate-200 hover:bg-slate-300 rounded-xl transition-colors"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SKU Barang (Otomatis) & Nama Produk */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-1">
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">SKU Barang</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: PLS-005"
-                    value={newProduct.sku}
-                    onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-600 uppercase">SKU Barang</label>
+                    {newProduct.sku && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-0.5">
+                        <Sparkles className="w-2.5 h-2.5 text-emerald-600" /> Otomatis
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder={skuLoading ? 'Menghitung SKU...' : 'Auto via Kategori & Sub'}
+                      value={skuLoading ? 'Membuat SKU...' : newProduct.sku}
+                      onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                    {skuLoading && (
+                      <div className="absolute right-2.5 top-2.5">
+                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                      </div>
+                    )}
+                    {!skuLoading && newProduct.category && newProduct.subCategory && (
+                      <button
+                        type="button"
+                        onClick={() => fetchAutoSku(newProduct.category, newProduct.subCategory)}
+                        className="absolute right-2 top-2 p-1 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-slate-100 transition-colors"
+                        title="Hitung Ulang SKU"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {skuInfo ? (
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      No. Urut: <span className="font-bold text-slate-800">{skuInfo.nextSequence}</span> (Kat: {skuInfo.categoryCode}, Sub: {skuInfo.subCategoryCode})
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      *Format: SKU. [kodeKat].[kodeSub].[noUrut+1]
+                    </p>
+                  )}
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Nama Produk</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                    Nama Produk <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: Kantong Kresek Bening HD 24"
+                    placeholder="Contoh: Plastik kresek merk REA warna putih ukuran 15"
                     value={newProduct.name}
                     onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                   />
-                </div>
-              </div>
-
-              {/* Kategori & Sub-Kategori */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Kategori</label>
-                  <input
-                    type="text"
-                    list="add-category-suggestions"
-                    placeholder="Pilih atau ketik kategori..."
-                    value={newProduct.category}
-                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                  />
-                  <datalist id="add-category-suggestions">
-                    {categoriesList.map((c) => (
-                      <option key={c.category} value={c.category} />
-                    ))}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Sub-Kategori</label>
-                  <input
-                    type="text"
-                    list="add-subcategory-suggestions"
-                    placeholder="Pilih atau ketik sub-kategori..."
-                    value={newProduct.subCategory}
-                    onChange={(e) => setNewProduct({ ...newProduct, subCategory: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                  />
-                  <datalist id="add-subcategory-suggestions">
-                    {categoriesList.flatMap((c) => c.subCategories).map((sc, idx) => (
-                      <option key={`${sc}-${idx}`} value={sc} />
-                    ))}
-                  </datalist>
                 </div>
               </div>
 

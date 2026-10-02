@@ -5,6 +5,7 @@ const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
 
 // Semua user terautentikasi bisa melihat produk & kategori
 router.get('/categories', verifyToken, productController.getCategories);
+router.get('/next-sku', verifyToken, productController.getNextSku);
 router.get('/', verifyToken, productController.getAllProducts);
 
 // Hanya Staff dan Admin yang bisa mengubah/menyesuaikan stok

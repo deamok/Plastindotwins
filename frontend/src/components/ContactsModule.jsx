@@ -22,6 +22,47 @@ import {
   FileText
 } from 'lucide-react';
 
+const PROVINSI_LIST = [
+  'Aceh',
+  'Sumatera Utara',
+  'Sumatera Barat',
+  'Riau',
+  'Kepulauan Riau',
+  'Jambi',
+  'Sumatera Selatan',
+  'Kepulauan Bangka Belitung',
+  'Bengkulu',
+  'Lampung',
+  'DKI Jakarta',
+  'Jawa Barat',
+  'Banten',
+  'Jawa Tengah',
+  'DI Yogyakarta',
+  'Jawa Timur',
+  'Bali',
+  'Nusa Tenggara Barat',
+  'Nusa Tenggara Timur',
+  'Kalimantan Barat',
+  'Kalimantan Tengah',
+  'Kalimantan Selatan',
+  'Kalimantan Timur',
+  'Kalimantan Utara',
+  'Sulawesi Utara',
+  'Gorontalo',
+  'Sulawesi Tengah',
+  'Sulawesi Barat',
+  'Sulawesi Selatan',
+  'Sulawesi Tenggara',
+  'Maluku',
+  'Maluku Utara',
+  'Papua',
+  'Papua Barat',
+  'Papua Selatan',
+  'Papua Tengah',
+  'Papua Pegunungan',
+  'Papua Barat Daya'
+];
+
 export default function ContactsModule({ user, onOpenAuth }) {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +86,7 @@ export default function ContactsModule({ user, onOpenAuth }) {
     phone: '',
     email: '',
     address: '',
+    province: '',
     bankName: 'BCA',
     bankAccountNo: '',
     bankAccountHolder: '',
@@ -84,6 +126,7 @@ export default function ContactsModule({ user, onOpenAuth }) {
       phone: '',
       email: '',
       address: '',
+      province: '',
       bankName: 'BCA',
       bankAccountNo: '',
       bankAccountHolder: '',
@@ -104,6 +147,7 @@ export default function ContactsModule({ user, onOpenAuth }) {
       phone: contact.phone || '',
       email: contact.email || '',
       address: contact.address || '',
+      province: contact.province || '',
       bankName: contact.bankName || 'BCA',
       bankAccountNo: contact.bankAccountNo || '',
       bankAccountHolder: contact.bankAccountHolder || '',
@@ -179,6 +223,7 @@ export default function ContactsModule({ user, onOpenAuth }) {
       (c.phone && c.phone.toLowerCase().includes(q)) ||
       (c.email && c.email.toLowerCase().includes(q)) ||
       (c.address && c.address.toLowerCase().includes(q)) ||
+      (c.province && c.province.toLowerCase().includes(q)) ||
       (c.bankName && c.bankName.toLowerCase().includes(q)) ||
       (c.bankAccountNo && c.bankAccountNo.toLowerCase().includes(q)) ||
       (c.bankAccountHolder && c.bankAccountHolder.toLowerCase().includes(q))
@@ -377,10 +422,21 @@ export default function ContactsModule({ user, onOpenAuth }) {
                           </div>
                         )}
 
-                        {contact.address && (
-                          <div className="flex items-start gap-1.5 text-slate-500 text-[11px]">
+                        {(contact.address || contact.province) && (
+                          <div className="flex items-start gap-1.5 text-slate-500 text-[11px] pt-0.5">
                             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                            <span className="line-clamp-1">{contact.address}</span>
+                            <div className="flex-1">
+                              {contact.address && (
+                                <p className="whitespace-pre-line text-slate-700 leading-tight">
+                                  {contact.address}
+                                </p>
+                              )}
+                              {contact.province && (
+                                <span className="inline-block mt-1 px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-medium border border-slate-200">
+                                  {contact.province}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -579,7 +635,7 @@ export default function ContactsModule({ user, onOpenAuth }) {
                 </div>
               </div>
 
-              {/* Email & Address */}
+              {/* Email & Propinsi */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Alamat Email</label>
@@ -592,15 +648,35 @@ export default function ContactsModule({ user, onOpenAuth }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Alamat Kantor / Toko</label>
+                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Propinsi</label>
                   <input
                     type="text"
-                    placeholder="Contoh: Jl. Raya Cilebut No. 12, Bogor"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    list="province-options"
+                    placeholder="Pilih atau ketik propinsi (misal: Jawa Tengah)..."
+                    value={formData.province}
+                    onChange={(e) => setFormData({ ...formData, province: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
                   />
+                  <datalist id="province-options">
+                    {PROVINSI_LIST.map((prov) => (
+                      <option key={prov} value={prov} />
+                    ))}
+                  </datalist>
                 </div>
+              </div>
+
+              {/* Alamat dibuat Multiline */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                  Alamat Kantor / Toko
+                </label>
+                <textarea
+                  rows="3"
+                  placeholder="Contoh: Jl. Kaligawe Raya No. 45&#10;Kec. Genuk, Kota Semarang"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-hidden resize-y"
+                ></textarea>
               </div>
 
               {/* Bank Account Section */}
@@ -726,10 +802,20 @@ export default function ContactsModule({ user, onOpenAuth }) {
                 </div>
               )}
 
-              {selectedContactDetail.address && (
-                <div className="p-2.5 bg-slate-50 rounded-xl">
-                  <span className="text-slate-500 block mb-0.5">Alamat:</span>
-                  <span className="font-medium text-slate-800">{selectedContactDetail.address}</span>
+              {(selectedContactDetail.address || selectedContactDetail.province) && (
+                <div className="p-2.5 bg-slate-50 rounded-xl space-y-1">
+                  <span className="text-slate-500 block text-[11px]">Alamat Lengkap:</span>
+                  {selectedContactDetail.address && (
+                    <p className="font-medium text-slate-800 whitespace-pre-line leading-relaxed">
+                      {selectedContactDetail.address}
+                    </p>
+                  )}
+                  {selectedContactDetail.province && (
+                    <div className="text-[11px] text-slate-600 flex items-center gap-1.5 pt-1.5 border-t border-slate-200/70 mt-1.5">
+                      <span className="text-slate-400">Propinsi:</span>
+                      <strong className="text-indigo-900 font-semibold">{selectedContactDetail.province}</strong>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -26,6 +26,7 @@ exports.getAllContacts = async (req, res) => {
         { phone: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
         { address: { contains: search, mode: 'insensitive' } },
+        { province: { contains: search, mode: 'insensitive' } },
         { bankName: { contains: search, mode: 'insensitive' } },
         { bankAccountNo: { contains: search, mode: 'insensitive' } },
         { bankAccountHolder: { contains: search, mode: 'insensitive' } }
@@ -94,6 +95,8 @@ exports.createContact = async (req, res) => {
       phone, 
       email, 
       address, 
+      province,
+      propinsi,
       bankName, 
       bankAccountNo, 
       bankAccountHolder, 
@@ -106,6 +109,7 @@ exports.createContact = async (req, res) => {
 
     const validTypes = ['CUSTOMER', 'SUPPLIER', 'BOTH'];
     const contactType = validTypes.includes(type) ? type : 'CUSTOMER';
+    const finalProvince = province !== undefined ? province : propinsi;
 
     const contact = await prisma.contact.create({
       data: {
@@ -114,6 +118,7 @@ exports.createContact = async (req, res) => {
         phone: phone ? phone.trim() : null,
         email: email ? email.trim() : null,
         address: address ? address.trim() : null,
+        province: finalProvince ? finalProvince.trim() : null,
         bankName: bankName ? bankName.trim() : null,
         bankAccountNo: bankAccountNo ? bankAccountNo.trim() : null,
         bankAccountHolder: bankAccountHolder ? bankAccountHolder.trim() : null,
@@ -141,6 +146,8 @@ exports.updateContact = async (req, res) => {
       phone, 
       email, 
       address, 
+      province,
+      propinsi,
       bankName, 
       bankAccountNo, 
       bankAccountHolder, 
@@ -152,6 +159,8 @@ exports.updateContact = async (req, res) => {
       return res.status(404).json({ message: 'Kontak tidak ditemukan.' });
     }
 
+    const finalProvince = province !== undefined ? province : propinsi;
+
     const contact = await prisma.contact.update({
       where: { id },
       data: {
@@ -160,6 +169,7 @@ exports.updateContact = async (req, res) => {
         phone: phone !== undefined ? (phone ? phone.trim() : null) : undefined,
         email: email !== undefined ? (email ? email.trim() : null) : undefined,
         address: address !== undefined ? (address ? address.trim() : null) : undefined,
+        province: finalProvince !== undefined ? (finalProvince ? finalProvince.trim() : null) : undefined,
         bankName: bankName !== undefined ? (bankName ? bankName.trim() : null) : undefined,
         bankAccountNo: bankAccountNo !== undefined ? (bankAccountNo ? bankAccountNo.trim() : null) : undefined,
         bankAccountHolder: bankAccountHolder !== undefined ? (bankAccountHolder ? bankAccountHolder.trim() : null) : undefined,

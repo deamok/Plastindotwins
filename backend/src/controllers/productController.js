@@ -41,30 +41,218 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
-// Ambil Daftar Kategori & Sub-Kategori Unik
+// Helper untuk menghitung kode kategori, kode sub-kategori, dan no urut SKU berikutnya
+async function getNextSkuHelper(category, subCategory) {
+  if (!category || !subCategory) return null;
+  const cleanCat = category.trim();
+  const cleanSub = subCategory.trim();
+
+  // Ambil seluruh produk dengan SKU berawalan 'SKU. '
+  const products = await prisma.product.findMany({
+    where: {
+      category: { not: null },
+      sku: { startsWith: 'SKU. ' }
+    },
+    select: { category: true, subCategory: true, sku: true }
+  });
+
+  const catCodeMap = {};
+  const usedCatCodes = new Set();
+  const subCodeMap = {};
+  const usedSubCodes = {};
+  const seqMap = {};
+
+  const defaultCategories = [
+    {
+      code: '01',
+      category: 'Plastik Kemasan',
+      subCategories: [
+        { code: '01', name: 'T-Shirt Bag' },
+        { code: '02', name: 'Plastik Shopebag' },
+        { code: '03', name: 'Plastik Cup (Gelas)' },
+        { code: '04', name: 'Plastik Sepatu' }
+      ]
+    },
+    {
+      code: '02',
+      category: 'Plastik Penyimpanan',
+      subCategories: [
+        { code: '01', name: 'Plastik Sampah' },
+        { code: '02', name: 'Plastik Laundry' },
+        { code: '03', name: 'Plastik Bening' }
+      ]
+    },
+    {
+      code: '03',
+      category: 'Kebutuhan Medis',
+      subCategories: [
+        { code: '01', name: 'Wadah Obat' },
+        { code: '02', name: 'Alat Kesehatan & Laboratorium' }
+      ]
+    },
+    {
+      code: '04',
+      category: 'Perlengkapan Penunjang',
+      subCategories: [
+        { code: '01', name: 'Kertas Tisu (Tissue)' },
+        { code: '02', name: 'Perekat (Tape)' }
+      ]
+    }
+  ];
+
+  for (const c of defaultCategories) {
+    catCodeMap[c.category.toLowerCase()] = c.code;
+    usedCatCodes.add(parseInt(c.code, 10));
+    subCodeMap[c.code] = {};
+    usedSubCodes[c.code] = new Set();
+    for (const sc of c.subCategories) {
+      subCodeMap[c.code][sc.name.toLowerCase()] = sc.code;
+      usedSubCodes[c.code].add(parseInt(sc.code, 10));
+    }
+  }
+
+  for (const p of products) {
+    const raw = p.sku.substring(5).trim();
+    const parts = raw.split('.');
+    if (parts.length < 3) continue;
+
+    const [cCodeStr, sCodeStr, seqStr] = parts;
+    const cNum = parseInt(cCodeStr, 10);
+    const sNum = parseInt(sCodeStr, 10);
+    const seqNum = parseInt(seqStr, 10);
+
+    if (isNaN(cNum) || isNaN(sNum) || isNaN(seqNum)) continue;
+
+    const cCode = String(cNum).padStart(2, '0');
+    const sCode = String(sNum).padStart(2, '0');
+
+    if (p.category) {
+      catCodeMap[p.category.trim().toLowerCase()] = cCode;
+      usedCatCodes.add(cNum);
+    }
+
+    if (!subCodeMap[cCode]) subCodeMap[cCode] = {};
+    if (!usedSubCodes[cCode]) usedSubCodes[cCode] = new Set();
+
+    if (p.subCategory) {
+      subCodeMap[cCode][p.subCategory.trim().toLowerCase()] = sCode;
+      usedSubCodes[cCode].add(sNum);
+    }
+
+    const key = `${cCode}.${sCode}`;
+    if (!seqMap[key] || seqNum > seqMap[key]) {
+      seqMap[key] = seqNum;
+    }
+  }
+
+  let cCode = catCodeMap[cleanCat.toLowerCase()];
+  if (!cCode) {
+    let nextCatNum = 1;
+    while (usedCatCodes.has(nextCatNum)) nextCatNum++;
+    cCode = String(nextCatNum).padStart(2, '0');
+    usedCatCodes.add(nextCatNum);
+    catCodeMap[cleanCat.toLowerCase()] = cCode;
+  }
+
+  if (!subCodeMap[cCode]) subCodeMap[cCode] = {};
+  if (!usedSubCodes[cCode]) usedSubCodes[cCode] = new Set();
+
+  let sCode = subCodeMap[cCode][cleanSub.toLowerCase()];
+  if (!sCode) {
+    let nextSubNum = 1;
+    while (usedSubCodes[cCode].has(nextSubNum)) nextSubNum++;
+    sCode = String(nextSubNum).padStart(2, '0');
+    usedSubCodes[cCode].add(nextSubNum);
+    subCodeMap[cCode][cleanSub.toLowerCase()] = sCode;
+  }
+
+  const key = `${cCode}.${sCode}`;
+  const lastSeq = seqMap[key] || 0;
+  const nextSeq = lastSeq + 1;
+  const seqStr = String(nextSeq).padStart(3, '0');
+
+  return {
+    sku: `SKU. ${cCode}.${sCode}.${seqStr}`,
+    categoryCode: cCode,
+    subCategoryCode: sCode,
+    lastSequence: lastSeq,
+    nextSequence: nextSeq,
+    category: cleanCat,
+    subCategory: cleanSub
+  };
+}
+
+// Ambil Daftar Kategori & Sub-Kategori Unik beserta kodenya
 exports.getCategories = async (req, res) => {
   try {
     const products = await prisma.product.findMany({
       where: { category: { not: null } },
-      select: { category: true, subCategory: true },
+      select: { category: true, subCategory: true, sku: true },
       distinct: ['category', 'subCategory']
     });
 
+    const defaultCategories = [
+      {
+        code: '01',
+        category: 'Plastik Kemasan',
+        subCategories: ['T-Shirt Bag', 'Plastik Shopebag', 'Plastik Cup (Gelas)', 'Plastik Sepatu']
+      },
+      {
+        code: '02',
+        category: 'Plastik Penyimpanan',
+        subCategories: ['Plastik Sampah', 'Plastik Laundry', 'Plastik Bening']
+      },
+      {
+        code: '03',
+        category: 'Kebutuhan Medis',
+        subCategories: ['Wadah Obat', 'Alat Kesehatan & Laboratorium']
+      },
+      {
+        code: '04',
+        category: 'Perlengkapan Penunjang',
+        subCategories: ['Kertas Tisu (Tissue)', 'Perekat (Tape)']
+      }
+    ];
+
     const catMap = {};
+    defaultCategories.forEach(c => {
+      catMap[c.category] = { code: c.code, subCategories: new Set(c.subCategories) };
+    });
+
     products.forEach((p) => {
       if (!p.category) return;
-      if (!catMap[p.category]) catMap[p.category] = new Set();
-      if (p.subCategory) catMap[p.category].add(p.subCategory);
+      if (!catMap[p.category]) {
+        catMap[p.category] = { code: '99', subCategories: new Set() };
+      }
+      if (p.subCategory) catMap[p.category].subCategories.add(p.subCategory);
     });
 
     const result = Object.keys(catMap).map((cat) => ({
       category: cat,
-      subCategories: Array.from(catMap[cat])
+      code: catMap[cat].code,
+      subCategories: Array.from(catMap[cat].subCategories)
     }));
+
+    result.sort((a, b) => (a.code || '99').localeCompare(b.code || '99'));
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ message: 'Gagal mengambil data kategori.', error: error.message });
+  }
+};
+
+// Endpoint untuk menghitung SKU baru otomatis berdasarkan kategori & sub-kategori
+exports.getNextSku = async (req, res) => {
+  try {
+    const { category, subCategory } = req.query;
+    if (!category || !subCategory) {
+      return res.status(400).json({ message: 'Parameter category dan subCategory wajib diisi.' });
+    }
+
+    const result = await getNextSkuHelper(category, subCategory);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal menghasilkan SKU otomatis.', error: error.message });
   }
 };
 
@@ -88,13 +276,21 @@ exports.createProduct = async (req, res) => {
       itemsPerPurchaseUnit 
     } = req.body;
 
-    if (!sku || !name || price === undefined) {
+    let productSku = sku ? sku.trim() : '';
+    if (!productSku && category && subCategory) {
+      const generated = await getNextSkuHelper(category, subCategory);
+      if (generated) {
+        productSku = generated.sku;
+      }
+    }
+
+    if (!productSku || !name || price === undefined) {
       return res.status(400).json({ message: 'SKU, nama, dan harga wajib diisi.' });
     }
     
-    const existingProduct = await prisma.product.findUnique({ where: { sku } });
+    const existingProduct = await prisma.product.findUnique({ where: { sku: productSku } });
     if (existingProduct) {
-      return res.status(400).json({ message: 'SKU sudah terdaftar.' });
+      return res.status(400).json({ message: `SKU "${productSku}" sudah terdaftar.` });
     }
 
     // Hitung alokasi stok per gudang
@@ -106,7 +302,7 @@ exports.createProduct = async (req, res) => {
       // 1. Buat master produk
       const product = await tx.product.create({
         data: {
-          sku,
+          sku: productSku,
           name,
           category: category || null,
           subCategory: subCategory || null,

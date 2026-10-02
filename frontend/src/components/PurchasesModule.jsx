@@ -41,6 +41,8 @@ export default function PurchasesModule({ user, onOpenAuth }) {
   // Form State
   const [supplierName, setSupplierName] = useState('');
   const [contactId, setContactId] = useState('');
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10));
   const [locationId, setLocationId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('PAID');
   const [notes, setNotes] = useState('');
@@ -83,6 +85,8 @@ export default function PurchasesModule({ user, onOpenAuth }) {
 
     setSupplierName('');
     setContactId('');
+    setInvoiceNo('');
+    setPurchaseDate(new Date().toISOString().slice(0, 10));
     setLocationId(defaultLoc?.id || '');
     setPaymentStatus('PAID');
     setNotes('');
@@ -161,6 +165,8 @@ export default function PurchasesModule({ user, onOpenAuth }) {
         supplierName,
         contactId: contactId || null,
         locationId: locationId || undefined,
+        invoiceNo: invoiceNo ? invoiceNo.trim() : null,
+        purchaseDate: purchaseDate || undefined,
         paymentStatus,
         notes,
         items
@@ -178,8 +184,10 @@ export default function PurchasesModule({ user, onOpenAuth }) {
   const filteredPurchases = purchases.filter((p) => {
     return (
       p.purchaseNo.toLowerCase().includes(search.toLowerCase()) ||
+      (p.invoiceNo && p.invoiceNo.toLowerCase().includes(search.toLowerCase())) ||
       p.supplierName.toLowerCase().includes(search.toLowerCase()) ||
       (p.contact?.name && p.contact.name.toLowerCase().includes(search.toLowerCase())) ||
+      (p.contact?.province && p.contact.province.toLowerCase().includes(search.toLowerCase())) ||
       (p.contact?.bankAccountNo && p.contact.bankAccountNo.toLowerCase().includes(search.toLowerCase())) ||
       (p.notes && p.notes.toLowerCase().includes(search.toLowerCase()))
     );
@@ -289,8 +297,8 @@ export default function PurchasesModule({ user, onOpenAuth }) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="px-6 py-4">No PO</th>
-                <th className="px-6 py-4">Waktu</th>
+                <th className="px-6 py-4">No PO / Faktur</th>
+                <th className="px-6 py-4">Tanggal</th>
                 <th className="px-6 py-4">Gudang Penerimaan</th>
                 <th className="px-6 py-4">Pemasok / Supplier</th>
                 <th className="px-6 py-4">Rincian Pembelian (Kg & Konversi)</th>
@@ -302,14 +310,29 @@ export default function PurchasesModule({ user, onOpenAuth }) {
             <tbody className="divide-y divide-slate-100 text-sm">
               {filteredPurchases.map((purchase) => (
                 <tr key={purchase.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-6 py-4 font-mono font-semibold text-slate-800 whitespace-nowrap">
-                    {purchase.purchaseNo}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="font-mono font-semibold text-slate-800">{purchase.purchaseNo}</div>
+                    {purchase.invoiceNo && (
+                      <div className="text-xs text-blue-600 font-mono flex items-center gap-1 mt-0.5" title="No. Faktur Supplier">
+                        <span className="text-[10px] bg-blue-50 border border-blue-200 px-1 py-0.2 rounded font-sans font-medium text-blue-700">Faktur:</span>
+                        <span>{purchase.invoiceNo}</span>
+                      </div>
+                    )}
                   </td>
-                  <td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
-                    {new Date(purchase.createdAt).toLocaleString('id-ID', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short'
-                    })}
+                  <td className="px-6 py-4 text-xs text-slate-600 whitespace-nowrap">
+                    <div className="font-medium text-slate-800">
+                      {new Date(purchase.purchaseDate || purchase.createdAt).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      })}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      {new Date(purchase.createdAt).toLocaleTimeString('id-ID', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })} WIB
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
@@ -318,13 +341,16 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="font-medium text-slate-900 flex items-center gap-1.5">
+                    <div className="font-medium text-slate-900 flex items-center gap-1.5 flex-wrap">
                       {purchase.contact && (
                         <span className="p-1 bg-blue-50 text-blue-700 rounded-md shrink-0" title="Supplier Terdaftar di Kontak">
                           <Users className="w-3.5 h-3.5" />
                         </span>
                       )}
                       <span>{purchase.supplierName}</span>
+                      {purchase.contact?.province && (
+                        <span className="text-xs text-slate-500 font-normal">({purchase.contact.province})</span>
+                      )}
                     </div>
                     {purchase.contact?.bankAccountNo && (
                       <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
@@ -377,7 +403,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
 
               {filteredPurchases.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan="8" className="px-6 py-12 text-center text-slate-400">
                     <Truck className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                     <p className="font-medium">Belum ada riwayat transaksi pembelian stok.</p>
                   </td>
@@ -386,7 +412,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
 
               {loading && (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
                     <p className="text-sm">Memuat riwayat pembelian...</p>
                   </td>
@@ -446,7 +472,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                     <option value="">-- Pilih dari Kontak Supplier (atau ketik manual) --</option>
                     {contacts.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} {c.bankName ? `[${c.bankName} ${c.bankAccountNo || ''}]` : ''} {c.phone ? `(${c.phone})` : ''}
+                        {c.name}{c.province ? ` (${c.province})` : ''}
                       </option>
                     ))}
                   </select>
@@ -494,13 +520,48 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                         )}
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600 pt-1 border-t border-blue-100">
                           {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-slate-400" /> {c.phone}</span>}
-                          {c.address && <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" /> {c.address}</span>}
+                          {c.address && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-slate-400" /> {c.address}{c.province ? `, ${c.province}` : ''}
+                            </span>
+                          )}
+                          {!c.address && c.province && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-slate-400" /> {c.province}
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
                   })()}
                 </div>
                 <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                        No. Faktur
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: INV-2026/001"
+                        value={invoiceNo}
+                        onChange={(e) => setInvoiceNo(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                        Tanggal <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={purchaseDate}
+                        onChange={(e) => setPurchaseDate(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden bg-white"
+                      />
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
                       Gudang Penerimaan Barang
@@ -717,7 +778,14 @@ export default function PurchasesModule({ user, onOpenAuth }) {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div>
                 <h3 className="font-bold text-base text-slate-900">Rincian Purchase Order (PO)</h3>
-                <p className="text-xs font-mono text-blue-600">{selectedPurchaseDetail.purchaseNo}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs font-mono text-blue-600 font-semibold">{selectedPurchaseDetail.purchaseNo}</span>
+                  {selectedPurchaseDetail.invoiceNo && (
+                    <span className="text-[11px] bg-blue-50 border border-blue-200 text-blue-800 px-2 py-0.5 rounded font-mono font-medium">
+                      Faktur: {selectedPurchaseDetail.invoiceNo}
+                    </span>
+                  )}
+                </div>
               </div>
               <button
                 onClick={() => setSelectedPurchaseDetail(null)}
@@ -729,7 +797,12 @@ export default function PurchasesModule({ user, onOpenAuth }) {
 
             <div className="text-xs space-y-2 mb-4 text-slate-600 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
               <div className="flex items-center justify-between">
-                <div>Supplier: <strong className="text-slate-900">{selectedPurchaseDetail.supplierName}</strong></div>
+                <div>
+                  Supplier: <strong className="text-slate-900">{selectedPurchaseDetail.supplierName}</strong>
+                  {selectedPurchaseDetail.contact?.province && (
+                    <span className="text-slate-500 font-medium ml-1">({selectedPurchaseDetail.contact.province})</span>
+                  )}
+                </div>
                 {selectedPurchaseDetail.contact && (
                   <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[11px] font-medium flex items-center gap-1">
                     <Users className="w-3 h-3" /> Mitra Kontak
@@ -767,14 +840,28 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                       <span className="flex items-center gap-1"><Phone className="w-3 h-3 text-slate-400" /> {selectedPurchaseDetail.contact.phone}</span>
                     )}
                     {selectedPurchaseDetail.contact.address && (
-                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" /> {selectedPurchaseDetail.contact.address}</span>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-slate-400" /> {selectedPurchaseDetail.contact.address}
+                        {selectedPurchaseDetail.contact.province ? `, ${selectedPurchaseDetail.contact.province}` : ''}
+                      </span>
+                    )}
+                    {!selectedPurchaseDetail.contact.address && selectedPurchaseDetail.contact.province && (
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" /> {selectedPurchaseDetail.contact.province}</span>
                     )}
                   </div>
                 </div>
               )}
               <div className="flex items-center justify-between pt-1">
                 <div>Status: <strong className="text-slate-900">{selectedPurchaseDetail.paymentStatus === 'PAID' ? 'LUNAS' : 'TEMPO / PENDING'}</strong></div>
-                <div>Tanggal: {new Date(selectedPurchaseDetail.createdAt).toLocaleString('id-ID')}</div>
+                <div>
+                  Tanggal: <strong className="text-slate-900">
+                    {new Date(selectedPurchaseDetail.purchaseDate || selectedPurchaseDetail.createdAt).toLocaleDateString('id-ID', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </strong>
+                </div>
               </div>
               {selectedPurchaseDetail.notes && <div>Catatan: {selectedPurchaseDetail.notes}</div>}
             </div>

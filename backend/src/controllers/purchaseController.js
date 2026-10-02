@@ -21,7 +21,7 @@ exports.getAllPurchases = async (req, res) => {
           select: { id: true, name: true, email: true }
         },
         contact: {
-          select: { id: true, name: true, phone: true, email: true, address: true, bankName: true, bankAccountNo: true, bankAccountHolder: true }
+          select: { id: true, name: true, phone: true, email: true, address: true, province: true, bankName: true, bankAccountNo: true, bankAccountHolder: true }
         }
       }
     });
@@ -36,8 +36,28 @@ exports.getAllPurchases = async (req, res) => {
 // Default masuk ke Gudang Bangetayu (Pusat Penyimpanan)
 exports.createPurchase = async (req, res) => {
   try {
-    const { supplierName, contactId, locationId, paymentStatus = 'PAID', notes, items } = req.body;
+    const { 
+      supplierName, 
+      contactId, 
+      locationId, 
+      invoiceNo,
+      fakturNo,
+      purchaseDate,
+      tanggal,
+      paymentStatus = 'PAID', 
+      notes, 
+      items 
+    } = req.body;
     const userId = req.user?.id || null;
+
+    const finalInvoiceNo = invoiceNo || fakturNo || null;
+    let finalPurchaseDate = new Date();
+    if (purchaseDate || tanggal) {
+      const parsedDate = new Date(purchaseDate || tanggal);
+      if (!isNaN(parsedDate.getTime())) {
+        finalPurchaseDate = parsedDate;
+      }
+    }
 
     let finalSupplierName = supplierName;
     if (contactId) {
@@ -138,6 +158,8 @@ exports.createPurchase = async (req, res) => {
       const purchase = await tx.purchase.create({
         data: {
           purchaseNo,
+          invoiceNo: finalInvoiceNo ? finalInvoiceNo.trim() : null,
+          purchaseDate: finalPurchaseDate,
           supplierName: finalSupplierName,
           contactId: contactId || null,
           locationId: targetLoc.id,
