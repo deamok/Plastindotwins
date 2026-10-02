@@ -14,5 +14,34 @@ services:
     volumes:
       - plastindo_db_data:/var/lib/postgresql/data
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      network: host
+    container_name: plastindo-backend
+    restart: always
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/plastindo_inventory?schema=public
+      - JWT_SECRET=supersecret_jwt_key_plastindo_12345
+      - NODE_ENV=production
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      network: host
+    container_name: plastindo-frontend
+    restart: always
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+
 volumes:
   plastindo_db_data:
