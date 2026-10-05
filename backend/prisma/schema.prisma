@@ -8,8 +8,11 @@ generator client {
 }
 
 enum Role {
+  DEVELOPER
   ADMIN
   STAFF
+  SALES
+  GUDANG
 }
 
 enum TransactionType {
@@ -23,6 +26,7 @@ enum ContactType {
   CUSTOMER
   SUPPLIER
   BOTH
+  EMPLOYEE
 }
 
 enum LocationType {
@@ -33,20 +37,28 @@ enum LocationType {
 model User {
   id             String          @id @default(uuid())
   email          String          @unique
-  password       String
+  password       String?
   name           String
-  role           Role            @default(STAFF)
+  avatarUrl      String?
+  googleId       String?         @unique
+  role           Role            @default(GUDANG)
+  contactId      String?
+  contact        Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   sales          Sale[]
   purchases      Purchase[]
   stockTransfers StockTransfer[]
+  auditLogs      AuditLog[]
 }
 
 model Contact {
   id                String       @id @default(uuid())
   name              String
-  type              ContactType  @default(CUSTOMER) // CUSTOMER, SUPPLIER, BOTH
+  type              ContactType  @default(CUSTOMER) // CUSTOMER, SUPPLIER, BOTH, EMPLOYEE
+  employeeRole      Role?        // ADMIN, SALES, GUDANG jika type === EMPLOYEE
+  status            String       @default("APPROVED") // PENDING, APPROVED, REJECTED
+  npwp              String?      // NPWP (Nomor Pokok Wajib Pajak) pelanggan / kontak
   phone             String?
   email             String?
   address           String?
@@ -59,6 +71,7 @@ model Contact {
   updatedAt         DateTime     @updatedAt
   sales             Sale[]
   purchases         Purchase[]
+  users             User[]
 }
 
 model Location {
@@ -146,36 +159,53 @@ model Transaction {
 }
 
 model Sale {
-  id            String     @id @default(uuid())
-  invoiceNo     String     @unique
-  customerName  String
-  contactId     String?
-  contact       Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  locationId    String?
-  location      Location?  @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  totalAmount   Decimal    @db.Decimal(12, 2)
-  paymentMethod String     @default("CASH") // CASH, TRANSFER, TEMPO
-  notes         String?
-  userId        String?
-  user          User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
-  items         SaleItem[]
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id              String     @id @default(uuid())
+  invoiceNo       String     @unique
+  offerNo         String?    // No. Penawaran: SPH-20261002-1234
+  deliveryNo      String?    // No. Surat Jalan / Pengiriman: SJ-20261002-1234
+  status          String     @default("OFFER_PENDING") // OFFER_PENDING, OFFER_APPROVED, OFFER_REJECTED, INVOICE, DELIVERING, COMPLETED
+  customerName    String
+  customerAddress String?
+  contactId       String?
+  contact         Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  locationId      String?
+  location        Location?  @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  totalAmount     Decimal    @db.Decimal(12, 2)
+  paymentMethod   String     @default("CASH") // CASH, TRANSFER, TEMPO
+  notes           String?
+  adminNotes      String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  approvedAt      DateTime?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  deliveryDriver  String?
+  deliveryNotes   String?
+  userId          String?
+  user            User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items           SaleItem[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 }
 
 model SaleItem {
-  id           String   @id @default(uuid())
-  saleId       String
-  sale         Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  productId    String
-  product      Product  @relation(fields: [productId], references: [id])
-  saleQty      Decimal  @default(1) @db.Decimal(10, 2) // Jumlah yang dijual dalam satuan terpilih (misal: 2 lusin atau 5 pack)
-  saleUnit     String   @default("buah") // Satuan transaksi penjualan: buah, pcs, lusin, pak/pack, kodi, dus, dll.
-  itemsPerUnit Decimal  @default(1) @db.Decimal(10, 2) // Rasio konversi: berapa unit stok dasar per 1 satuan penjualan
-  quantity     Int      // Total unit stok fisik yang berkurang dalam satuan dasar produk (buah/pak)
-  unitPrice    Decimal  @db.Decimal(10, 2) // Harga per satuan transaksi terpilih
-  subtotal     Decimal  @db.Decimal(12, 2) // saleQty * unitPrice
-  createdAt    DateTime @default(now())
+  id            String   @id @default(uuid())
+  saleId        String
+  sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  saleQty       Decimal  @default(1) @db.Decimal(10, 2) // Jumlah yang dijual dalam satuan terpilih (misal: 2 lusin atau 5 pack)
+  saleUnit      String   @default("buah") // Satuan transaksi penjualan: buah, pcs, lusin, pak/pack, kodi, dus, dll.
+  itemsPerUnit  Decimal  @default(1) @db.Decimal(10, 2) // Rasio konversi: berapa unit stok dasar per 1 satuan penjualan
+  quantity      Int      // Total unit stok fisik yang berkurang dalam satuan dasar produk (buah/pak)
+  appPrice      Decimal  @default(0) @db.Decimal(10, 2) // Harga standar aplikasi per satuan terpilih
+  offeredPrice  Decimal  @default(0) @db.Decimal(10, 2) // Harga penawaran yang diinput sales
+  adminPrice    Decimal? @db.Decimal(10, 2) // Harga revisi admin jika tidak setuju harga sales
+  adminDecision String?  // 'APPROVED' (setuju harga sales), 'USE_APP_PRICE' (tolak, pakai harga aplikasi), 'CUSTOM_PRICE' (tolak, pakai harga baru admin)
+  isReviewed    Boolean  @default(false)
+  unitPrice     Decimal  @db.Decimal(10, 2) // Harga aktif yang digunakan untuk subtotal
+  subtotal      Decimal  @db.Decimal(12, 2) // saleQty * unitPrice
+  createdAt     DateTime @default(now())
 }
 
 model Purchase {
@@ -211,4 +241,24 @@ model PurchaseItem {
   costPrice    Decimal  @db.Decimal(10, 2) // Harga beli per kg
   subtotal     Decimal  @db.Decimal(12, 2) // purchaseQty * costPrice
   createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName   String?
+  userRole   String?
+  action     String   // LOGIN, STOCK_ADJUSTMENT, PRODUCT_CREATE, PRODUCT_UPDATE, PRODUCT_DELETE, OFFER_CREATE, OFFER_STATUS_CHANGE, PURCHASE_CREATE, STOCK_TRANSFER, CONTACT_CREATE, CONTACT_UPDATE, CONTACT_DELETE
+  entity     String   // AUTH, PRODUCT, SALE, PURCHASE, TRANSFER, CONTACT
+  entityId   String?
+  targetName String?  // Nama Produk, No Dokumen/Invoice/SPH, Nama Kontak
+  details    String?  // Ringkasan detail perubahan
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([entity])
+  @@index([userId])
 }

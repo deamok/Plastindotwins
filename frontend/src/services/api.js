@@ -30,6 +30,9 @@ api.interceptors.response.use(
 export const authService = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
+  googleLogin: (data) => api.post('/auth/google', data),
+  registerEmployee: (data) => api.post('/auth/register-employee', data),
+  getRegisteredGoogleEmployees: () => api.get('/auth/google-employees'),
   getMe: () => api.get('/auth/me'),
 };
 
@@ -44,13 +47,19 @@ export const productService = {
 };
 
 export const saleService = {
-  getSales: () => api.get('/sales'),
+  getSales: (params) => api.get('/sales', { params }),
   createSale: (data) => api.post('/sales', data),
+  reviewOffer: (id, data) => api.put(`/sales/${id}/review`, data),
+  approveToInvoice: (id) => api.put(`/sales/${id}/approve-to-invoice`),
+  updateShippingStatus: (id, data) => api.put(`/sales/${id}/shipping`, data),
+  updateSale: (id, data) => api.put(`/sales/${id}`, data),
+  deleteSale: (id) => api.delete(`/sales/${id}`),
 };
 
 export const purchaseService = {
   getPurchases: () => api.get('/purchases'),
   createPurchase: (data) => api.post('/purchases', data),
+  deletePurchase: (id) => api.delete(`/purchases/${id}`),
 };
 
 export const contactService = {
@@ -58,6 +67,8 @@ export const contactService = {
   getContactById: (id) => api.get(`/contacts/${id}`),
   createContact: (data) => api.post('/contacts', data),
   updateContact: (id, data) => api.put(`/contacts/${id}`, data),
+  approveEmployee: (id, data) => api.put(`/contacts/${id}/approve`, data),
+  rejectEmployee: (id) => api.put(`/contacts/${id}/reject`),
   deleteContact: (id) => api.delete(`/contacts/${id}`),
 };
 
@@ -65,6 +76,12 @@ export const locationService = {
   getLocations: () => api.get('/locations'),
   transferStock: (data) => api.post('/locations/transfer', data),
   getTransfers: () => api.get('/locations/transfers'),
+};
+
+export const auditService = {
+  getAuditLogs: (params) => api.get('/audit-logs', { params }),
+  getAuditStats: () => api.get('/audit-logs/stats'),
+  cleanupAuditLogs: (days) => api.post('/audit-logs/cleanup', { days }),
 };
 
 export default api;

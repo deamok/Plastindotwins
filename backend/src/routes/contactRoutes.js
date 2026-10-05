@@ -18,7 +18,13 @@ router.post('/', contactController.createContact);
 // 4. Update data kontak (Admin & Staff)
 router.put('/:id', contactController.updateContact);
 
-// 5. Hapus kontak (Hanya Admin)
-router.delete('/:id', authorizeRoles('ADMIN'), contactController.deleteContact);
+// 5. Setujui Pendaftaran Karyawan (HANYA Super Admin / DEVELOPER)
+router.put('/:id/approve', authorizeRoles('DEVELOPER'), contactController.approveEmployee);
+
+// 6. Tolak Pendaftaran Karyawan (HANYA Super Admin / DEVELOPER)
+router.put('/:id/reject', authorizeRoles('DEVELOPER'), contactController.rejectEmployee);
+
+// 7. Hapus kontak (Admin & Developer)
+router.delete('/:id', authorizeRoles('ADMIN', 'DEVELOPER'), contactController.deleteContact);
 
 module.exports = router;

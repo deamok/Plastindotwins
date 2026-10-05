@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { logActivity } = require('../utils/auditLogger');
 const prisma = new PrismaClient();
 
 // 1. Ambil Semua Daftar Produk Beserta Stok per Lokasi Gudang
@@ -35,7 +36,20 @@ exports.getAllProducts = async (req, res) => {
       }
     });
 
-    res.status(200).json({ success: true, data: products });
+    // Role-based Price Masking:
+    // Sales HANYA mengetahui harga penjualan (price), TIDAK BISA mengetahui harga pembelian (costPrice).
+    // Gudang HANYA mengetahui harga pembelian (costPrice), TIDAK BISA mengetahui harga penjualan (price).
+    const sanitizedProducts = products.map((prod) => {
+      const p = { ...prod };
+      if (req.user?.role === 'SALES') {
+        p.costPrice = null;
+      } else if (req.user?.role === 'GUDANG') {
+        p.price = null;
+      }
+      return p;
+    });
+
+    res.status(200).json({ success: true, data: sanitizedProducts });
   } catch (error) {
     res.status(500).json({ message: 'Gagal mengambil data produk.', error: error.message });
   }
@@ -354,6 +368,15 @@ exports.createProduct = async (req, res) => {
         }
       });
     });
+
+    logActivity({
+      req,
+      action: 'PRODUCT_CREATE',
+      entity: 'PRODUCT',
+      entityId: result.id,
+      targetName: result.name,
+      details: `Menambah produk baru "${result.name}" (SKU: ${result.sku})`
+    });
     
     res.status(201).json({ success: true, data: result });
   } catch (error) {
@@ -448,10 +471,26 @@ exports.adjustStock = async (req, res) => {
 
     const isLowStock = result.updatedProduct.stock <= result.updatedProduct.minStock;
 
+    const sanitizedProduct = { ...result.updatedProduct };
+    if (req.user?.role === 'SALES') {
+      sanitizedProduct.costPrice = null;
+    } else if (req.user?.role === 'GUDANG') {
+      sanitizedProduct.price = null;
+    }
+
+    logActivity({
+      req,
+      action: 'STOCK_ADJUSTMENT',
+      entity: 'PRODUCT',
+      entityId: result.updatedProduct.id,
+      targetName: result.updatedProduct.name,
+      details: `Penyesuaian stok ${type === 'STOCK_IN' ? 'Masuk' : 'Keluar'} (${qty} ${result.updatedProduct.unit}) di ${result.targetLocation.name}. Total stok: ${result.updatedProduct.stock}`
+    });
+
     res.status(200).json({
       success: true,
       message: `Stok berhasil diperbarui di ${result.targetLocation.name} (${type})`,
-      data: result.updatedProduct,
+      data: sanitizedProduct,
       alert: isLowStock ? `Peringatan: Stok ${result.updatedProduct.name} hampir habis!` : null
     });
   } catch (error) {
@@ -541,22 +580,28 @@ exports.updateProduct = async (req, res) => {
       }
 
       // 4. Update data produk
+      const updateData = {
+        sku: sku || undefined,
+        name: name !== undefined ? name : undefined,
+        category: category !== undefined ? (category || null) : undefined,
+        subCategory: subCategory !== undefined ? (subCategory || null) : undefined,
+        description: description !== undefined ? description : undefined,
+        minStock: minStock !== undefined ? parseInt(minStock) : undefined,
+        costPrice: costPrice !== undefined ? costPrice : undefined,
+        unit: unit !== undefined ? unit : undefined,
+        purchaseUnit: purchaseUnit !== undefined ? purchaseUnit : undefined,
+        itemsPerPurchaseUnit: itemsPerPurchaseUnit !== undefined ? parseFloat(itemsPerPurchaseUnit) : undefined,
+        stock: shouldRecalculateStock ? totalStock : undefined
+      };
+
+      // Hanya Admin & Developer yang dapat mengubah harga jual produk (Gudang tidak mengubah harga jual)
+      if (req.user?.role !== 'GUDANG' && price !== undefined && price !== null && price !== '') {
+        updateData.price = price;
+      }
+
       const updated = await tx.product.update({
         where: { id },
-        data: {
-          sku: sku || undefined,
-          name: name !== undefined ? name : undefined,
-          category: category !== undefined ? (category || null) : undefined,
-          subCategory: subCategory !== undefined ? (subCategory || null) : undefined,
-          description: description !== undefined ? description : undefined,
-          minStock: minStock !== undefined ? parseInt(minStock) : undefined,
-          price: price !== undefined ? price : undefined,
-          costPrice: costPrice !== undefined ? costPrice : undefined,
-          unit: unit !== undefined ? unit : undefined,
-          purchaseUnit: purchaseUnit !== undefined ? purchaseUnit : undefined,
-          itemsPerPurchaseUnit: itemsPerPurchaseUnit !== undefined ? parseFloat(itemsPerPurchaseUnit) : undefined,
-          stock: shouldRecalculateStock ? totalStock : undefined
-        },
+        data: updateData,
         include: {
           stocks: {
             include: { location: true }
@@ -567,10 +612,26 @@ exports.updateProduct = async (req, res) => {
       return updated;
     });
 
+    const sanitizedResult = { ...result };
+    if (req.user?.role === 'GUDANG') {
+      sanitizedResult.price = null;
+    } else if (req.user?.role === 'SALES') {
+      sanitizedResult.costPrice = null;
+    }
+
+    logActivity({
+      req,
+      action: 'PRODUCT_UPDATE',
+      entity: 'PRODUCT',
+      entityId: result.id,
+      targetName: result.name,
+      details: `Memperbarui data / stok produk "${result.name}". Total stok sekarang: ${result.stock} ${result.unit}`
+    });
+
     res.status(200).json({ 
       success: true, 
       message: 'Data produk dan stok berhasil diperbarui.',
-      data: result 
+      data: sanitizedResult 
     });
   } catch (error) {
     res.status(400).json({ message: error.message || 'Gagal memperbarui produk.' });
@@ -581,7 +642,22 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ message: 'Produk tidak ditemukan.' });
+    }
+
     await prisma.product.delete({ where: { id } });
+
+    logActivity({
+      req,
+      action: 'PRODUCT_DELETE',
+      entity: 'PRODUCT',
+      entityId: id,
+      targetName: existing.name,
+      details: `Menghapus produk "${existing.name}" (SKU: ${existing.sku})`
+    });
+
     res.status(200).json({ success: true, message: 'Produk berhasil dihapus.' });
   } catch (error) {
     res.status(500).json({ message: 'Gagal menghapus produk.', error: error.message });

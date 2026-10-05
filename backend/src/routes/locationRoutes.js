@@ -7,7 +7,7 @@ const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
 router.get('/', verifyToken, locationController.getAllLocations);
 router.get('/transfers', verifyToken, locationController.getTransferHistory);
 
-// Admin dan Staff bisa melakukan mutasi/transfer stok antar gudang
-router.post('/transfer', verifyToken, authorizeRoles('ADMIN', 'STAFF'), locationController.transferStock);
+// Admin, Gudang, dan Developer bisa melakukan mutasi/transfer stok antar gudang
+router.post('/transfer', verifyToken, authorizeRoles('ADMIN', 'GUDANG', 'DEVELOPER'), locationController.transferStock);
 
 module.exports = router;

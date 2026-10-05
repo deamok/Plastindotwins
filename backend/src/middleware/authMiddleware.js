@@ -21,11 +21,19 @@ exports.verifyToken = (req, res, next) => {
 // Otorisasi Berdasarkan Peran (Role RBAC)
 exports.authorizeRoles = (...allowedRoles) => {
   return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+    if (!req.user) {
       return res.status(403).json({ 
         message: 'Hak akses ditolak. Anda tidak memiliki izin untuk tindakan ini.' 
       });
     }
-    next();
+
+    // DEVELOPER memiliki hak akses tertinggi ke semua aksi / modul
+    if (req.user.role === 'DEVELOPER' || allowedRoles.includes(req.user.role)) {
+      return next();
+    }
+
+    return res.status(403).json({ 
+      message: 'Hak akses ditolak. Anda tidak memiliki izin untuk tindakan ini.' 
+    });
   };
 };

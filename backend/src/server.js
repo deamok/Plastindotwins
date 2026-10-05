@@ -8,6 +8,7 @@ const saleRoutes = require('./routes/saleRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const contactRoutes = require('./routes/contactRoutes');
 const locationRoutes = require('./routes/locationRoutes');
+const auditRoutes = require('./routes/auditRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -29,6 +30,7 @@ app.use('/api/sales', saleRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/audit-logs', auditRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -46,6 +48,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Terjadi kesalahan pada server.', error: err.message });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server berjalan di http://0.0.0.0:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server berjalan di http://0.0.0.0:${PORT}`);
+  });
+}
+
+module.exports = app;

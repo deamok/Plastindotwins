@@ -3,6 +3,7 @@ import { productService, locationService } from '../services/api';
 import SalesModule from './SalesModule';
 import PurchasesModule from './PurchasesModule';
 import ContactsModule from './ContactsModule';
+import AuditLogsModule from './AuditLogsModule';
 import { 
   Package, 
   AlertTriangle, 
@@ -117,7 +118,13 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
 
   useEffect(() => {
     fetchInventory();
-  }, [user]);
+    if (user?.role === 'SALES' && activeTab === 'purchases') {
+      setActiveTab('sales');
+    }
+    if (user?.role !== 'DEVELOPER' && activeTab === 'audit') {
+      setActiveTab('inventory');
+    }
+  }, [user, activeTab]);
 
   const fetchInventory = async () => {
     const token = localStorage.getItem('token');
@@ -257,8 +264,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       onOpenAuth();
       return;
     }
-    if (user.role !== 'ADMIN') {
-      setError(`Gagal otorisasi: Akun Anda adalah "${user.role}". Hanya peran ADMIN yang dapat menambah produk baru.`);
+    if (user.role !== 'ADMIN' && user.role !== 'DEVELOPER') {
+      setError(`Gagal otorisasi: Akun Anda adalah "${user.role}". Hanya peran ADMIN atau DEVELOPER yang dapat menambah produk baru.`);
       return;
     }
     setNewProduct({
@@ -288,8 +295,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       onOpenAuth();
       return;
     }
-    if (user.role !== 'ADMIN') {
-      setError('Gagal otorisasi: Hanya akun peran ADMIN yang diizinkan mendaftarkan produk baru.');
+    if (user.role !== 'ADMIN' && user.role !== 'DEVELOPER') {
+      setError('Gagal otorisasi: Hanya akun peran ADMIN atau DEVELOPER yang diizinkan mendaftarkan produk baru.');
       setIsAddModalOpen(false);
       return;
     }
@@ -340,8 +347,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       onOpenAuth();
       return;
     }
-    if (user.role !== 'ADMIN') {
-      setError(`Akses ditolak: Hanya peran ADMIN yang dapat mengedit data produk.`);
+    if (user.role !== 'ADMIN' && user.role !== 'DEVELOPER' && user.role !== 'GUDANG') {
+      setError(`Akses ditolak: Hanya peran ADMIN, DEVELOPER, atau GUDANG yang dapat mengedit data produk.`);
       return;
     }
 
@@ -371,9 +378,13 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
     if (!editProductForm.id) return;
+    if (user?.role !== 'ADMIN' && user?.role !== 'DEVELOPER' && user?.role !== 'GUDANG') {
+      setError('Akses ditolak: Anda tidak memiliki izin untuk mengedit produk.');
+      return;
+    }
     try {
       setError('');
-      await productService.updateProduct(editProductForm.id, {
+      const payload = {
         sku: editProductForm.sku,
         name: editProductForm.name,
         category: editProductForm.category || null,
@@ -383,11 +394,16 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
         unit: editProductForm.unit,
         purchaseUnit: editProductForm.purchaseUnit,
         itemsPerPurchaseUnit: parseFloat(editProductForm.itemsPerPurchaseUnit) || 1,
-        price: parseFloat(editProductForm.price) || 0,
         costPrice: parseFloat(editProductForm.costPrice) || 0,
         stockBangetayu: parseInt(editProductForm.stockBangetayu) || 0,
         stockJomblang: parseInt(editProductForm.stockJomblang) || 0
-      });
+      };
+
+      if (user?.role !== 'GUDANG') {
+        payload.price = parseFloat(editProductForm.price) || 0;
+      }
+
+      await productService.updateProduct(editProductForm.id, payload);
       setSuccessMsg(`Data produk "${editProductForm.name}" dan penyesuaian stok berhasil disimpan!`);
       setIsEditModalOpen(false);
       setSelectedProduct(null);
@@ -399,6 +415,10 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
   };
 
   const handleDeleteProduct = async (productId, productName) => {
+    if (user?.role !== 'ADMIN' && user?.role !== 'DEVELOPER') {
+      setError('Akses ditolak: Hanya peran ADMIN atau DEVELOPER yang dapat menghapus produk.');
+      return;
+    }
     if (!window.confirm(`Yakin ingin menghapus produk "${productName}" secara permanen? Seluruh riwayat transaksi produk ini juga akan terhapus.`)) {
       return;
     }
@@ -557,12 +577,15 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-600 text-white p-2 rounded-xl shadow-sm">
-              <Package className="w-6 h-6" />
-            </div>
+            <img
+              src="/image_logo.png"
+              alt="PLASTINDOTWINS"
+              className="h-10 w-auto object-contain shrink-0"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
             <div>
-              <span className="font-bold text-lg text-slate-900 leading-none block">Plastindo Twins</span>
-              <span className="text-xs text-slate-500 font-medium">ERP & Inventory Multi-Gudang</span>
+              <span className="font-bold text-lg text-slate-900 leading-none block">PLASTINDOTWINS</span>
+              <span className="text-xs text-slate-500 font-medium">Solusi Plastik Kemasan Medis</span>
             </div>
           </div>
 
@@ -577,30 +600,37 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
               }`}
             >
               <Package className="w-4 h-4" />
-              <span>Inventori Stok</span>
+              <span>Stok Barang</span>
             </button>
-            <button
-              onClick={() => setActiveTab('sales')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                activeTab === 'sales'
-                  ? 'bg-white text-emerald-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ShoppingCart className="w-4 h-4" />
-              <span>Penjualan (Sales)</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('purchases')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                activeTab === 'purchases'
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Truck className="w-4 h-4" />
-              <span>Pembelian (Supplier)</span>
-            </button>
+
+            {(!user || user.role === 'DEVELOPER' || user.role === 'ADMIN' || user.role === 'SALES' || user.role === 'GUDANG') && (
+              <button
+                onClick={() => setActiveTab('sales')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                  activeTab === 'sales'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span>{user?.role === 'GUDANG' ? 'Pengiriman & Faktur' : 'Penawaran & Penjualan'}</span>
+              </button>
+            )}
+
+            {(!user || user.role === 'DEVELOPER' || user.role === 'ADMIN' || user.role === 'GUDANG') && (
+              <button
+                onClick={() => setActiveTab('purchases')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                  activeTab === 'purchases'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Truck className="w-4 h-4" />
+                <span>Purchasing</span>
+              </button>
+            )}
+
             <button
               onClick={() => setActiveTab('contacts')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
@@ -610,21 +640,61 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>Kontak & Rekening</span>
+              <span>Kontak & Mitra</span>
             </button>
+
+            {user?.role === 'DEVELOPER' && (
+              <button
+                onClick={() => setActiveTab('audit')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                  activeTab === 'audit'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <History className="w-4 h-4 text-slate-600" />
+                <span>Log Aktivitas</span>
+              </button>
+            )}
           </nav>
 
           {/* User Session Info / Login Action */}
           <div className="flex items-center gap-3">
             {user ? (
               <div className="flex items-center gap-3">
-                <div className="hidden sm:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200/60">
-                  <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
-                    {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                  </div>
+                <div className="hidden sm:flex items-center gap-2.5 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200/60">
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover shadow-2xs" />
+                  ) : (
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-2xs ${
+                      user.role === 'DEVELOPER' ? 'bg-purple-600' : user.role === 'ADMIN' ? 'bg-blue-600' : user.role === 'SALES' ? 'bg-emerald-600' : 'bg-amber-600'
+                    }`}>
+                      {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                  )}
                   <div className="text-left">
                     <span className="text-xs font-semibold text-slate-800 leading-tight block">{user.name}</span>
-                    <span className="text-[10px] text-blue-600 font-bold block">{user.role}</span>
+                    <span className={`text-[10px] font-bold block ${
+                      user.email?.toLowerCase().trim() === 'cahyonosugeng83@gmail.com'
+                        ? 'text-purple-700'
+                        : user.role === 'DEVELOPER'
+                        ? 'text-purple-600'
+                        : user.role === 'ADMIN'
+                        ? 'text-blue-600'
+                        : user.role === 'SALES'
+                        ? 'text-emerald-600'
+                        : 'text-amber-600'
+                    }`}>
+                      {user.email?.toLowerCase().trim() === 'cahyonosugeng83@gmail.com'
+                        ? '👑 Owner'
+                        : user.role === 'DEVELOPER'
+                        ? '💻 Developer'
+                        : user.role === 'ADMIN'
+                        ? '👑 Admin'
+                        : user.role === 'SALES'
+                        ? '💼 Sales'
+                        : '📦 Gudang'}
+                    </span>
                   </div>
                 </div>
                 <button
@@ -656,26 +726,33 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
             }`}
           >
             <Package className="w-4 h-4" />
-            <span>Inventori</span>
+            <span>Stok Barang</span>
           </button>
-          <button
-            onClick={() => setActiveTab('sales')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
-              activeTab === 'sales' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600'
-            }`}
-          >
-            <ShoppingCart className="w-4 h-4" />
-            <span>Sales</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('purchases')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
-              activeTab === 'purchases' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600'
-            }`}
-          >
-            <Truck className="w-4 h-4" />
-            <span>Beli</span>
-          </button>
+
+          {(!user || user.role === 'DEVELOPER' || user.role === 'ADMIN' || user.role === 'SALES' || user.role === 'GUDANG') && (
+            <button
+              onClick={() => setActiveTab('sales')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
+                activeTab === 'sales' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600'
+              }`}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>{user?.role === 'GUDANG' ? 'Kirim' : 'Penjualan'}</span>
+            </button>
+          )}
+
+          {(!user || user.role === 'DEVELOPER' || user.role === 'ADMIN' || user.role === 'GUDANG') && (
+            <button
+              onClick={() => setActiveTab('purchases')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
+                activeTab === 'purchases' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600'
+              }`}
+            >
+              <Truck className="w-4 h-4" />
+              <span>Purchasing</span>
+            </button>
+          )}
+
           <button
             onClick={() => setActiveTab('contacts')}
             className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
@@ -685,6 +762,18 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
             <Users className="w-4 h-4" />
             <span>Kontak</span>
           </button>
+
+          {user?.role === 'DEVELOPER' && (
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
+                activeTab === 'audit' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+              }`}
+            >
+              <History className="w-4 h-4 text-slate-600" />
+              <span>Log</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -720,6 +809,20 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
           <PurchasesModule user={user} onOpenAuth={onOpenAuth} />
         ) : activeTab === 'contacts' ? (
           <ContactsModule user={user} onOpenAuth={onOpenAuth} />
+        ) : activeTab === 'audit' ? (
+          user?.role === 'DEVELOPER' ? (
+            <AuditLogsModule user={user} onOpenAuth={onOpenAuth} />
+          ) : (
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center shadow-xs">
+              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-1">Akses Ditolak</h3>
+              <p className="text-sm text-slate-500 max-w-md mx-auto">
+                Halaman Log Aktivitas hanya dapat diakses oleh Developer.
+              </p>
+            </div>
+          )
         ) : (
           <div>
             {/* Alerts */}
@@ -785,21 +888,29 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
 
               {/* Warehouse Quick Buttons */}
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => openTransferModal()}
-                  className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
-                  title="Mutasi Antar Gudang"
-                >
-                  <ArrowLeftRight className="w-4 h-4 text-indigo-600" />
-                  <span>Mutasi Antar Gudang</span>
-                </button>
-                <button
-                  onClick={openHistoryModal}
-                  className="p-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs transition-colors"
-                  title="Riwayat Mutasi Antar Gudang"
-                >
-                  <History className="w-4 h-4" />
-                </button>
+                {user?.role === 'SALES' ? (
+                  <span className="text-xs font-medium text-slate-500 px-3 py-1.5 bg-slate-100 rounded-xl border border-slate-200">
+                    👁️ Mode Lihat Ketersediaan Stok
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => openTransferModal()}
+                      className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                      title="Mutasi Antar Gudang"
+                    >
+                      <ArrowLeftRight className="w-4 h-4 text-indigo-600" />
+                      <span>Mutasi Antar Gudang</span>
+                    </button>
+                    <button
+                      onClick={openHistoryModal}
+                      className="p-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-xs transition-colors"
+                      title="Riwayat Mutasi Antar Gudang"
+                    >
+                      <History className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -926,13 +1037,15 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                   >
                     <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
                   </button>
-                  <button
-                    onClick={handleOpenAddModal}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                    <span>Tambah Produk</span>
-                  </button>
+                  {(user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && (
+                    <button
+                      onClick={handleOpenAddModal}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-xs transition-colors"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>Tambah Produk</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -989,7 +1102,7 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                       <th className="px-5 py-4">Nama Produk & Kategori</th>
                       <th className="px-5 py-4">Stok Fisik per Gudang</th>
                       <th className="px-5 py-4">Status</th>
-                      <th className="px-5 py-4 text-center">Aksi / Edit</th>
+                      <th className="px-5 py-4 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
@@ -1063,25 +1176,36 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap text-center">
                             <div className="inline-flex items-center gap-1.5 justify-center">
-                              {/* Tombol Edit Barang di Stok */}
-                              <button
-                                onClick={() => openEditModal(product)}
-                                title="Edit Data & Stok Barang"
-                                className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors border border-blue-200 flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
-                              >
-                                <Edit3 className="w-4 h-4 text-blue-600" />
-                                <span>Edit</span>
-                              </button>
+                              {/* Tombol Edit Data & Stok Barang (Admin, Developer & Gudang) */}
+                              {(user?.role === 'DEVELOPER' || user?.role === 'ADMIN' || user?.role === 'GUDANG') && (
+                                <button
+                                  onClick={() => openEditModal(product)}
+                                  title="Edit Data & Stok Barang"
+                                  className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors border border-blue-200 flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
+                                >
+                                  <Edit3 className="w-4 h-4 text-blue-600" />
+                                  <span>Edit</span>
+                                </button>
+                              )}
 
-                              {/* Tombol Transfer Cepat Antar Gudang */}
-                              <button
-                                onClick={() => openTransferModal(product)}
-                                title="Mutasi Stok Produk Ini Antar Gudang"
-                                className="px-2.5 py-1.5 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors border border-indigo-200 flex items-center gap-1 text-xs font-semibold shadow-2xs"
-                              >
-                                <ArrowLeftRight className="w-4 h-4" />
-                                <span>Mutasi</span>
-                              </button>
+                              {/* Tombol Transfer Cepat Antar Gudang (Admin, Developer & Gudang) */}
+                              {(user?.role === 'DEVELOPER' || user?.role === 'ADMIN' || user?.role === 'GUDANG') && (
+                                <button
+                                  onClick={() => openTransferModal(product)}
+                                  title="Mutasi Stok Produk Ini Antar Gudang"
+                                  className="px-2.5 py-1.5 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors border border-indigo-200 flex items-center gap-1 text-xs font-semibold shadow-2xs"
+                                >
+                                  <ArrowLeftRight className="w-4 h-4" />
+                                  <span>Mutasi</span>
+                                </button>
+                              )}
+
+                              {/* Sales: View only notice */}
+                              {user?.role === 'SALES' && (
+                                <span className="text-[11px] text-slate-400 italic px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
+                                  Lihat Saja
+                                </span>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1241,8 +1365,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                     >
                       <option value="buah">Buah / Pcs (bh)</option>
                       <option value="lembar">Lembar (lbr)</option>
-                      <option value="bungkus">Bungkus / Pak (bks)</option>
-                      <option value="pak">Pak</option>
+                      <option value="bungkus">Bungkus (bks)</option>
+                      <option value="pack">Pack</option>
                       <option value="roll">Roll</option>
                     </select>
                   </div>
@@ -1265,20 +1389,22 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
               </div>
 
               {/* Harga Jual & Modal Beli */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
-                    Harga Jual per {editProductForm.unit} (Rp)
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={editProductForm.price}
-                    onChange={(e) => setEditProductForm({ ...editProductForm, price: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                  />
-                </div>
+              <div className={`grid grid-cols-1 ${user?.role === 'GUDANG' ? 'sm:grid-cols-1' : 'sm:grid-cols-2'} gap-3`}>
+                {user?.role !== 'GUDANG' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                      Harga Jual per {editProductForm.unit} (Rp)
+                    </label>
+                    <input
+                      type="number"
+                      required={user?.role !== 'GUDANG'}
+                      min="0"
+                      value={editProductForm.price}
+                      onChange={(e) => setEditProductForm({ ...editProductForm, price: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
                     Estimasi Beli per {editProductForm.purchaseUnit} (Rp)
@@ -1348,14 +1474,16 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => handleDeleteProduct(editProductForm.id, editProductForm.name)}
-                  className="px-3.5 py-2 text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-red-200"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Hapus Produk</span>
-                </button>
+                {(user?.role === 'DEVELOPER' || user?.role === 'ADMIN') ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteProduct(editProductForm.id, editProductForm.name)}
+                    className="px-3.5 py-2 text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-red-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Hapus Produk</span>
+                  </button>
+                ) : <div />}
 
                 <div className="flex items-center gap-2">
                   <button
@@ -1624,8 +1752,8 @@ export default function Dashboard({ user, onLogout, onOpenAuth }) {
                     >
                       <option value="buah">Buah / Pcs (bh)</option>
                       <option value="lembar">Lembar (lbr)</option>
-                      <option value="bungkus">Bungkus / Pak (bks)</option>
-                      <option value="pak">Pak</option>
+                      <option value="bungkus">Bungkus (bks)</option>
+                      <option value="pack">Pack</option>
                       <option value="roll">Roll</option>
                     </select>
                   </div>

@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { logActivity } = require('../utils/auditLogger');
 const prisma = new PrismaClient();
 
 // 1. Ambil Semua Lokasi Gudang beserta Ringkasan Stok
@@ -161,6 +162,15 @@ exports.transferStock = async (req, res) => {
         sourceStock: updatedSourceStock.stock,
         destStock: updatedDestStock.stock
       };
+    });
+
+    logActivity({
+      req,
+      action: 'STOCK_TRANSFER',
+      entity: 'TRANSFER',
+      entityId: result.transfer.id,
+      targetName: result.transfer.product.name,
+      details: `Mutasi stok ${qty} ${result.transfer.product.unit} dari ${result.transfer.sourceLocation.name} ke ${result.transfer.destLocation.name} (No: ${result.transfer.transferNo})`
     });
 
     res.status(200).json({

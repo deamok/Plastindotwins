@@ -3,6 +3,9 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { verifyToken } = require('../middleware/authMiddleware');
 
+router.post('/google', authController.googleLogin);
+router.post('/register-employee', authController.registerEmployee);
+router.get('/google-employees', authController.getRegisteredGoogleEmployees);
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.get('/me', verifyToken, authController.getMe);

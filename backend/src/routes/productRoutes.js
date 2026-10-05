@@ -8,14 +8,14 @@ router.get('/categories', verifyToken, productController.getCategories);
 router.get('/next-sku', verifyToken, productController.getNextSku);
 router.get('/', verifyToken, productController.getAllProducts);
 
-// Hanya Staff dan Admin yang bisa mengubah/menyesuaikan stok
-router.post('/adjust-stock', verifyToken, authorizeRoles('ADMIN', 'STAFF'), productController.adjustStock);
+// Gudang, Admin, dan Developer bisa mengubah/menyesuaikan stok fisik
+router.post('/adjust-stock', verifyToken, authorizeRoles('ADMIN', 'GUDANG', 'DEVELOPER'), productController.adjustStock);
 
-// Hanya Admin yang bisa mendaftarkan produk baru ke sistem
-router.post('/create', verifyToken, authorizeRoles('ADMIN'), productController.createProduct);
+// Admin dan Developer bisa mendaftarkan produk baru ke sistem
+router.post('/create', verifyToken, authorizeRoles('ADMIN', 'DEVELOPER'), productController.createProduct);
 
-// Update dan Hapus produk
-router.put('/:id', verifyToken, authorizeRoles('ADMIN'), productController.updateProduct);
-router.delete('/:id', verifyToken, authorizeRoles('ADMIN'), productController.deleteProduct);
+// Update produk & stok (Admin, Developer & Gudang)
+router.put('/:id', verifyToken, authorizeRoles('ADMIN', 'DEVELOPER', 'GUDANG'), productController.updateProduct);
+router.delete('/:id', verifyToken, authorizeRoles('ADMIN', 'DEVELOPER'), productController.deleteProduct);
 
 module.exports = router;

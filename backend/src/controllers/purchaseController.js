@@ -1,9 +1,17 @@
 const { PrismaClient } = require('@prisma/client');
+const { logActivity } = require('../utils/auditLogger');
 const prisma = new PrismaClient();
 
-// 1. Ambil Semua Riwayat Pembelian
+// 1. Ambil Semua Riwayat Pembelian (Supplier)
+// Sales TIDAK BISA mengetahui harga pembelian / transaksi supplier
 exports.getAllPurchases = async (req, res) => {
   try {
+    if (req.user?.role === 'SALES') {
+      return res.status(403).json({ 
+        message: 'Hak akses ditolak. Akun Sales tidak memiliki izin melihat data atau harga pembelian supplier.' 
+      });
+    }
+
     const purchases = await prisma.purchase.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -219,6 +227,15 @@ exports.createPurchase = async (req, res) => {
       return purchase;
     });
 
+    logActivity({
+      req,
+      action: 'PURCHASE_CREATE',
+      entity: 'PURCHASE',
+      entityId: createdPurchase.id,
+      targetName: `${createdPurchase.purchaseNo} - ${createdPurchase.supplierName}`,
+      details: `Input transaksi pembelian #${createdPurchase.purchaseNo} dari ${createdPurchase.supplierName}. Total: Rp ${Number(createdPurchase.totalAmount).toLocaleString('id-ID')}`
+    });
+
     res.status(201).json({
       success: true,
       message: `Transaksi pembelian berhasil disimpan dan stok telah masuk ke ${createdPurchase.location?.name || 'gudang'}.`,
@@ -228,3 +245,68 @@ exports.createPurchase = async (req, res) => {
     res.status(400).json({ message: error.message || 'Gagal memproses transaksi pembelian.' });
   }
 };
+
+// 3. Hapus / Batalkan Transaksi Pembelian (Admin & Developer)
+// Mengembalikan stok fisik produk dari lokasi penerimaan barang dan mencatat pembatalan mutasi
+exports.deletePurchase = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const purchase = await prisma.purchase.findUnique({
+      where: { id },
+      include: { items: true, location: true }
+    });
+
+    if (!purchase) {
+      return res.status(404).json({ message: 'Data pembelian tidak ditemukan.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Kurangi kembali stok produk di gudang lokasi penerimaan
+      for (const item of purchase.items) {
+        if (purchase.locationId) {
+          await tx.productStock.updateMany({
+            where: { productId: item.productId, locationId: purchase.locationId },
+            data: { stock: { decrement: item.quantity } }
+          });
+        }
+
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } }
+        });
+
+        await tx.transaction.create({
+          data: {
+            productId: item.productId,
+            locationId: purchase.locationId,
+            type: 'STOCK_OUT',
+            quantity: item.quantity,
+            notes: `Pembatalan PO #${purchase.purchaseNo} (Supplier: ${purchase.supplierName})`
+          }
+        });
+      }
+
+      // 2. Hapus detail item & transaksi pembelian
+      await tx.purchaseItem.deleteMany({ where: { purchaseId: id } });
+      await tx.purchase.delete({ where: { id } });
+    });
+
+    logActivity({
+      req,
+      action: 'PURCHASE_DELETE',
+      entity: 'PURCHASE',
+      entityId: id,
+      targetName: `${purchase.purchaseNo} - ${purchase.supplierName}`,
+      details: `Membatalkan & menghapus transaksi pembelian #${purchase.purchaseNo} dari ${purchase.supplierName}`
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Transaksi pembelian #${purchase.purchaseNo} berhasil dibatalkan dan stok telah disesuaikan.`
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message || 'Gagal membatalkan transaksi pembelian.' });
+  }
+};
+

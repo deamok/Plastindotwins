@@ -180,6 +180,21 @@ export default function PurchasesModule({ user, onOpenAuth }) {
     }
   };
 
+  const handleDeletePurchase = async (purchase) => {
+    if (!window.confirm(`Yakin ingin membatalkan & menghapus transaksi pembelian #${purchase.purchaseNo}? Stok barang yang masuk dari PO ini akan dikurangi kembali dari gudang.`)) {
+      return;
+    }
+    try {
+      setError('');
+      await purchaseService.deletePurchase(purchase.id);
+      setSuccessMsg(`Transaksi pembelian #${purchase.purchaseNo} berhasil dibatalkan dan stok telah disesuaikan.`);
+      fetchData();
+      setTimeout(() => setSuccessMsg(''), 5000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal membatalkan pembelian.');
+    }
+  };
+
   // Filtered purchases
   const filteredPurchases = purchases.filter((p) => {
     return (
@@ -251,7 +266,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-slate-500">Total Fisik Masuk Gudang</p>
-            <p className="text-2xl font-bold text-slate-900 mt-1">{totalItemsPurchased.toLocaleString('id-ID')} <span className="text-sm font-normal text-slate-500">unit (buah/pak)</span></p>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{totalItemsPurchased.toLocaleString('id-ID')} <span className="text-sm font-normal text-slate-500">unit (buah/pack)</span></p>
           </div>
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
             <Layers className="w-6 h-6" />
@@ -390,13 +405,22 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                       {purchase.paymentStatus === 'PAID' ? 'LUNAS' : 'TEMPO / PENDING'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <td className="px-6 py-4 whitespace-nowrap text-right space-x-1.5">
                     <button
                       onClick={() => setSelectedPurchaseDetail(purchase)}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
                     >
                       Detail
                     </button>
+                    {(user?.role === 'DEVELOPER' || user?.role === 'ADMIN') && (
+                      <button
+                        onClick={() => handleDeletePurchase(purchase)}
+                        title="Batalkan & Hapus PO (Pengembalian Stok)"
+                        className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        Hapus
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -740,7 +764,7 @@ export default function PurchasesModule({ user, onOpenAuth }) {
                 <div>
                   <span className="text-xs text-slate-500 block">Total Stok Fisik yang Ditambahkan:</span>
                   <span className="text-base font-bold text-emerald-800">
-                    +{calculateTotalBaseUnits().toLocaleString('id-ID')} unit (buah/pak)
+                    +{calculateTotalBaseUnits().toLocaleString('id-ID')} unit (buah/pack)
                   </span>
                 </div>
                 <div className="text-right">

@@ -28,6 +28,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/plastindo_inventory?schema=public
       - JWT_SECRET=supersecret_jwt_key_plastindo_12345
       - NODE_ENV=production
+      - GOOGLE_CLIENT_ID=1081464509928-qvuaegjo5dju4tdvb9dq6r4s9rkmrqte.apps.googleusercontent.com
     depends_on:
       - db
 
